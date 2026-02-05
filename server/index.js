@@ -2,6 +2,7 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE } from "./map/ProceduralMap.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -9,7 +10,9 @@ const io = new Server(server);
 
 app.use(express.static("../client"));
 
-const WORLD_SIZE = 3000;
+const world = generateWorld();
+const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size  
+
 const players = {};
 const enemies = [
   // Example enemy data
@@ -18,7 +21,7 @@ const enemies = [
 ];
 
 // Spawn enemies at random positions within the world
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 101; i++) {
   const id = `enemy${i}`;
   enemies.push({
     id: id,
@@ -33,12 +36,9 @@ io.on("connection", socket => {
   players[socket.id] = { 
     // Spawn players at random positions within the world
     x: Math.floor(Math.random() * WORLD_SIZE),
-    // x: WORLD_SIZE / 2 * Math.random() + WORLD_SIZE / 4,
     y: Math.floor(Math.random() * WORLD_SIZE), 
-    // x: 200, y: 200,
     hp: 100 
   };
-  // players[socket.id] = { x: 200, y: 200, hp: 100 };
 
   socket.on("playerInput", dir => {
     const p = players[socket.id];
@@ -72,7 +72,9 @@ setInterval(() => {
     // Check if player is within a certain range (e.g., 300 units)
     for (const id in players) {
       const p = players[id];
-      if (checkIfPlayerAlive(p)) {
+      if (!checkIfPlayerAlive(p)) {
+        delete players[id]; // Remove dead player from the game
+      } else {
         alivePlayers.push(p);
       }
     }
@@ -106,13 +108,6 @@ setInterval(() => {
       enemy.x += enemy.moveDirection.x * 1; // Slower random movement
       enemy.y += enemy.moveDirection.y * 1;
 
-      // Move enemies randomly if no player is nearby in a more natural way, instead of jittery random movement
-        // const angle = Math.random() * 2 * Math.PI;
-        // enemy.x += Math.cos(angle) * 1; // Slower random movement
-        // enemy.y += Math.sin(angle) * 1;
-
-    
-    
     }
 
     // Keep enemy within world bounds
@@ -127,7 +122,7 @@ setInterval(() => {
         if (players[id] === closestPlayer) {
           players[id].hp = 0; // Set player HP to 0 to indicate they are "dead"
           players[id].isAlive = false; // Mark player as not alive
-          // delete players[id];
+          delete players[id];
           break;
         }
       }
@@ -150,8 +145,13 @@ setInterval(() => {
   }
 
   // Broadcast updated game state to all clients
-  io.emit("state", { players, enemies, worldSize: WORLD_SIZE });
+  io.emit("state", { players, enemies, world });
 }, 1000 / 30);
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
 
 const checkIfPlayerAlive = (person) => {
   if (person.hp <= 0) {
@@ -160,8 +160,3 @@ const checkIfPlayerAlive = (person) => {
   }
   return true;
 }
-
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});

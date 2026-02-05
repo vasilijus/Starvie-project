@@ -1,5 +1,6 @@
 import { Player } from "./modules/Player.js";
-import { World } from "./modules/World.js";
+// import { World } from "./modules/World.js";
+import { WorldRenderer } from "./modules/WorldRenderer.js";
 
 const socket = io();
 let myId = null;
@@ -19,7 +20,8 @@ canvas.height = window.innerHeight;
 
 // const player = new Player("Player", socket.id);
 const player = new Player("Player");
-const world = new World();
+// const world = new World();
+const worldRenderer = new WorldRenderer();
 // world.addPlayer(player);
 const enemies = [
   // Example enemy data
@@ -47,7 +49,8 @@ socket.on('state', data => {
 
   player.update();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  world.draw(ctx, player);
+  // world.draw(ctx, player);
+  worldRenderer.draw(ctx, data.world, player);
 
   // Draw players
   for(const id in players) {
