@@ -4,6 +4,7 @@ const WORLD_CHUNKS = 10;
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size
 
 const TILE_COLORS = {
+  "snow": "#FFFFF0",
   "forest": "#228B22",
   "plains": "#7CFC00",
   "desert": "#EDC9AF"

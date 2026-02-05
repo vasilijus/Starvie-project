@@ -32,6 +32,43 @@ const enemies = [
 const keys = {};
 addEventListener("keydown", e => keys[e.key] = true);
 addEventListener("keyup", e => keys[e.key] = false);
+addEventListener("click", e => {
+
+  // Check which direction the player is pointing based on mouse position relative to player position
+  const clickX = player.x - canvas.width/2 + e.clientX;
+  const clickY = player.y - canvas.height/2 + e.clientY;
+  const dirX = clickX - player.x;
+  const dirY = clickY - player.y;
+  const length = Math.sqrt(dirX * dirX + dirY * dirY);
+  const normDirX = dirX / length;
+  const normDirY = dirY / length;
+
+  // Depending on the weapon the player has equipped, you can send different actions to the server (e.g., attack, harvest)
+  // For example, if the player has a weapon equipped, send an attack action to the server with the direction
+  // If no weapon is equipped, the damage can be lower or it can be a harvesting action instead
+  // Here we will just send an attack action for demonstration purposes
+  socket.emit('attack', { x: normDirX, y: normDirY });
+
+  // Alternatively, if the player is clicking on a resource, you can send a harvest action to the server
+  // const clickX = player.x - canvas.width/2 + e.clientX;
+  // const clickY = player.y - canvas.height/2 + e.clientY;
+  // socket.emit('harvest', { x: clickX, y: clickY });
+
+
+  // Example of sending an attack action to the server with direction
+  // socket.emit('attack', { x: normDirX, y: normDirY });
+
+  // check if player is clicking on a resource (this is a simplified example, you would need to check against actual resource positions in the world)
+  // const clickX = player.x - canvas.width/2 + e.clientX;
+  // const clickY = player.y - canvas.height/2 + e.clientY;
+  // socket.emit('harvest', { x: clickX, y: clickY });
+  
+  // Example of sending a harvest action to the server when clicking on a resource
+  // const clickX = player.x - canvas.width/2 + e.clientX;
+  // const clickY = player.y - canvas.height/2 + e.clientY;
+  // socket.emit('harvest', { x: clickX, y: clickY });
+});
+
 
 
 ctx.fillStyle = "black";
@@ -39,7 +76,7 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 
 socket.on('state', data => {
-  const { players, enemies: enemyData, worldSize } = data;
+  const { players, enemies: enemyData, worldSize, resources } = data;
 
   if (players[myId]) {
     player.x = players[myId].x;
@@ -56,7 +93,7 @@ socket.on('state', data => {
   for(const id in players) {
     const p = players[id];
     ctx.fillStyle = id === myId ? 'blue' : 'red'; // Highlight own player in blue
-    console.log(`Player ${id}: x=${p.x}, y=${p.y}, hp=${p.hp}`); // Debug log for player positions and health
+    // console.log(`Player ${id}: x=${p.x}, y=${p.y}, hp=${p.hp}`); // Debug log for player positions and health
     // Draw square
     // ctx.fillRect(p.x, p.y, 50, 50);
     ctx.fillRect(p.x - player.x + canvas.width/2, p.y - player.y + canvas.height/2, 20, 20);
@@ -76,6 +113,16 @@ socket.on('state', data => {
     // drawPerson(ctx, enemy.x - player.x + canvas.width/2, enemy.y - player.y + canvas.height/2, enemy.hp);
   }
 
+  // Draw resources
+  console.log(`Resources: ${resources.length}`); // Debug log for number of resources
+  for(const resource of resources) {
+    // console.log(`Resource ${JSON.stringify(resourcea)}`); // Debug log for resource details
+    const sx = resource.x - player.x + canvas.width/2;
+    const sy = resource.y - player.y + canvas.height/2;
+    ctx.fillStyle = resource.icon_color || 'green';
+    ctx.fillRect(sx, sy, 10, 10);
+    // Optionally, draw resource type or HP if needed
+  }
 
 });
 
