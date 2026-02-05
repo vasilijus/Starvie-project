@@ -1,8 +1,8 @@
-
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE } from "./map/ProceduralMap.js";
+import { Player } from './modules/Player.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -101,12 +101,11 @@ for (let i = 0; i < 101; i++) {
 
 
 io.on("connection", socket => {
-  players[socket.id] = { 
-    // Spawn players at random positions within the world
-    x: Math.floor(Math.random() * WORLD_SIZE),
-    y: Math.floor(Math.random() * WORLD_SIZE), 
-    hp: 100 
-  };
+  players[socket.id] = new Player(
+    socket.id,
+    Math.floor(Math.random() * WORLD_SIZE),
+    Math.floor(Math.random() * WORLD_SIZE)
+  );
 
   socket.on("playerInput", dir => {
     const p = players[socket.id];
@@ -134,7 +133,7 @@ io.on("connection", socket => {
       resources.splice(resourceIndex, 1); // Remove harvested resource from the game
     }
   });
-  
+
   socket.on('playerAction', (data) => {
       const player = players[socket.id];
       if (!player || !player.isAlive) return;
@@ -269,8 +268,10 @@ setInterval(() => {
     const dy = closestPlayer.y - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 20) { // Collision radius
-      closestPlayer.hp -= 1; // Reduce player HP
-      enemy.hp -= 1; // Reduce enemy HP
+      console.log(`Enemy ${enemy.id} attacks player for 1 damage!`);
+      closestPlayer.takeDamage(1); // Reduce player HP using the Player class method
+      // closestPlayer.hp -= 1; // Reduce player HP
+      enemy.hp -= 1; // Reduce enemy aHP
       if (enemy.hp <= 0) {
         enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
       }
@@ -280,7 +281,10 @@ setInterval(() => {
   }
 
   // Broadcast updated game state to all clients
-  io.emit("state", { players, enemies, world, resources });
+  const statePlayers = Object.fromEntries(
+    Object.entries(players).map(([id, p]) => [id, p.toClient()])
+  );
+  io.emit("state", { players: statePlayers, enemies, world, resources });
 }, 1000 / 30);
 
 const PORT = process.env.PORT || 3001;
