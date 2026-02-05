@@ -33,40 +33,37 @@ const keys = {};
 addEventListener("keydown", e => keys[e.key] = true);
 addEventListener("keyup", e => keys[e.key] = false);
 addEventListener("click", e => {
+  // 1. Calculate the target point in the world based on the click
+  const clickX = player.x - canvas.width / 2 + e.clientX;
+  const clickY = player.y - canvas.height / 2 + e.clientY;
 
-  // Check which direction the player is pointing based on mouse position relative to player position
-  const clickX = player.x - canvas.width/2 + e.clientX;
-  const clickY = player.y - canvas.height/2 + e.clientY;
+  // 2. Calculate the direction vector from the player to the click
   const dirX = clickX - player.x;
   const dirY = clickY - player.y;
   const length = Math.sqrt(dirX * dirX + dirY * dirY);
-  const normDirX = dirX / length;
-  const normDirY = dirY / length;
-
-  // Depending on the weapon the player has equipped, you can send different actions to the server (e.g., attack, harvest)
-  // For example, if the player has a weapon equipped, send an attack action to the server with the direction
-  // If no weapon is equipped, the damage can be lower or it can be a harvesting action instead
-  // Here we will just send an attack action for demonstration purposes
-  socket.emit('attack', { x: normDirX, y: normDirY });
-
-  // Alternatively, if the player is clicking on a resource, you can send a harvest action to the server
-  // const clickX = player.x - canvas.width/2 + e.clientX;
-  // const clickY = player.y - canvas.height/2 + e.clientY;
-  // socket.emit('harvest', { x: clickX, y: clickY });
-
-
-  // Example of sending an attack action to the server with direction
-  // socket.emit('attack', { x: normDirX, y: normDirY });
-
-  // check if player is clicking on a resource (this is a simplified example, you would need to check against actual resource positions in the world)
-  // const clickX = player.x - canvas.width/2 + e.clientX;
-  // const clickY = player.y - canvas.height/2 + e.clientY;
-  // socket.emit('harvest', { x: clickX, y: clickY });
+  if (length === 0) return; // Avoid division by zero
   
-  // Example of sending a harvest action to the server when clicking on a resource
-  // const clickX = player.x - canvas.width/2 + e.clientX;
-  // const clickY = player.y - canvas.height/2 + e.clientY;
-  // socket.emit('harvest', { x: clickX, y: clickY });
+  // 3. Normalise the direction (so it's a value between -1 and 1)
+  const normDir = {
+    x: dirX / length,
+    y: dirY / length
+  };
+
+  // 4. Determine action based on equipment (Assuming player.equipment exists)
+  // You can expand this logic as you add more items
+  const currentEquipment = player.equipment || 'none'; 
+  const actionType = (currentEquipment === 'sword' || currentEquipment === 'axe') 
+    ? 'attack' 
+    : 'interact';
+
+  // 5. Emit the action to the server
+  socket.emit('playerAction', {
+    type: actionType,
+    direction: normDir,
+    item: currentEquipment
+  });
+
+  console.log(`Action Sent: ${actionType} using ${currentEquipment}`);
 });
 
 
@@ -101,6 +98,7 @@ socket.on('state', data => {
     const posX = p.x - player.x + canvas.width/2;
     const posY = p.y - player.y + canvas.height/2;
     // drawPerson(ctx, posX, posY, p.hp);
+    drawPersonHealthBar(ctx, posX, posY, p.hp);
   }
 
   // Draw enemies
@@ -111,6 +109,7 @@ socket.on('state', data => {
     ctx.fillStyle = 'grey';
     ctx.fillRect(sx, sy, 20, 20);
     // drawPerson(ctx, enemy.x - player.x + canvas.width/2, enemy.y - player.y + canvas.height/2, enemy.hp);
+    drawPersonHealthBar(ctx, sx, sy, enemy.hp);
   }
 
   // Draw resources
@@ -162,7 +161,7 @@ function drawPerson(ctx, x, y, hp) {
 
 function drawPersonHealthBar(ctx, x, y, hp) {
   ctx.fillStyle = 'green';
-  ctx.fillRect(x - 15, y - 20, (hp / 100) * 30, 5);
+  ctx.fillRect(x - 5, y - 20, (hp / 100) * 30, 5);
 }
 
 

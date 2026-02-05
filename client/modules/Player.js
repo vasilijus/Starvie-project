@@ -13,7 +13,12 @@ export class Player {
         this.health = 100;
         this.speed = 5;
         this.inventory = [];
-        this.equipment = {};
+        this.equipment = {
+            mainHand: null,
+            offHand: null,
+            head: null,
+            body: null
+        };
         this.isAlive = true;
     }
 
@@ -23,27 +28,32 @@ export class Player {
         this.renderY += (this.y - this.renderY) * 0.1;
     }
 
-    regenerateHealth(amount) {
-        if (!this.isAlive) return;
-        this.health = Math.min(100, this.health + amount);
-    }
+    equip(itemName) {
+        this.equipment.mainHand = itemName;
+        console.log(`${this.name} equipped ${itemName}`);
+}
 
-    takeDamage(amount) {
-        if (!this.isAlive) return;
-        this.health -= amount;
-        if (this.health <= 0) {
-            this.health = 0;
-            this.isAlive = false;
-            // Handle player death (e.g., respawn, drop inventory, etc.)
-        }
-    }
+    // regenerateHealth(amount) {
+    //     if (!this.isAlive) return;
+    //     this.health = Math.min(100, this.health + amount);
+    // }
 
-    harvestResource(resource) {
-        if (!this.isAlive) return;
-        // Add resource to inventory and remove from world
-        this.inventory.push(resource);
-        // Notify server to remove resource from world (not implemented here)
-    }
+    // takeDamage(amount) {
+    //     if (!this.isAlive) return;
+    //     this.health -= amount;
+    //     if (this.health <= 0) {
+    //         this.health = 0;
+    //         this.isAlive = false;
+    //         // Handle player death (e.g., respawn, drop inventory, etc.)
+    //     }
+    // }
+
+    // harvestResource(resource) {
+    //     if (!this.isAlive) return;
+    //     // Add resource to inventory and remove from world
+    //     this.inventory.push(resource);
+    //     // Notify server to remove resource from world (not implemented here)
+    // }
     
     // Additional methods for combat, crafting, etc. can be added here
 

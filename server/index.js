@@ -51,6 +51,12 @@ function getBiome(x, y) {
 //   });
 // }
 
+function getDistance(x1, y1, x2, y2) {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
 function spawnResources(x, y) {
   const biome = getBiome(x, y);
   let {resourceType, icon_color} = {};
@@ -74,6 +80,7 @@ function spawnResources(x, y) {
   const resourceId = `resource${Date.now()}`;
   resources.push({ id: resourceId, x, y, type: resourceType, hp: 100, icon_color: icon_color });
 }
+
 
 // Spawn resources
 for (let i = 0; i < 100; i++) {
@@ -126,6 +133,59 @@ io.on("connection", socket => {
       // For example: players[socket.id].inventory.push(resource.type);
       resources.splice(resourceIndex, 1); // Remove harvested resource from the game
     }
+  });
+  
+  socket.on('playerAction', (data) => {
+      const player = players[socket.id];
+      if (!player || !player.isAlive) return;
+
+      const reach = 40; // How far the player reaches
+      const hitRadius = 30; // The size of the "hit" area
+
+      // 1. Calculate the exact point in the world the player is "hitting"
+      const hitX = player.x + (data.direction.x * reach);
+      const hitY = player.y + (data.direction.y * reach);
+
+      // 2. Check for Enemies (Combat Logic)
+      // We look for any enemy close to our hit point
+      const hitEnemy = enemies.find(enemy => 
+          getDistance(hitX, hitY, enemy.x, enemy.y) < hitRadius
+      );
+
+      if (hitEnemy) {
+          // Apply damage logic
+          const baseDamage = 10;
+          const multiplier = data.weapon ? 2.5 : 1.0; 
+          const totalDamage = baseDamage * multiplier;
+
+          hitEnemy.hp -= totalDamage;
+          console.log(`Enemy ${hitEnemy.id} hit for ${totalDamage}!`);
+          
+          // Remove enemy if dead
+          if (hitEnemy.hp <= 0) {
+              const index = enemies.indexOf(hitEnemy);
+              enemies.splice(index, 1);
+          }
+          return; // Stop here if we hit an enemy
+      }
+
+      // 3. Check for Resources (Gathering Logic)
+      // If no enemy was hit, check if we clicked a resource
+      const hitResource = resources.find(res => 
+          getDistance(hitX, hitY, res.x, res.y) < 25
+      );
+
+      if (hitResource) {
+          console.log(`Gathering resource: ${hitResource.type}`);
+          
+          // Logic to give player items
+          if (!player.inventory) player.inventory = [];
+          player.inventory.push(hitResource.type);
+
+          // Remove resource from world
+          const resIndex = resources.indexOf(hitResource);
+          resources.splice(resIndex, 1);
+      }
   });
 
   socket.on("disconnect", () => {
