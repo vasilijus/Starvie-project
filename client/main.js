@@ -2,6 +2,11 @@ import { Player } from "./modules/Player.js";
 import { World } from "./modules/World.js";
 
 const socket = io();
+let myId = null;
+socket.on('connect', () => {
+  myId = socket.id;
+  console.log(`Connected to server with ID: ${myId}`);
+});
 
 console.log('Client connected to server');
 console.log(socket.id); // Log the socket ID
@@ -16,6 +21,11 @@ canvas.height = window.innerHeight;
 const player = new Player("Player");
 const world = new World();
 // world.addPlayer(player);
+const enemies = [
+  // Example enemy data
+  // { id: "enemy1", x: 500, y: 500, hp: 50 },
+  // { id: "enemy2", x: 1500, y: 1500, hp: 75 }
+];
 
 const keys = {};
 
@@ -43,18 +53,23 @@ socket.on('privateData', msg => {
 // socket.emit('p data', "{socket.id}") // Replace {socket.id} with actual socket ID if needed")
 
 socket.on('state', players => {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  player.update();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   world.draw(ctx, player);
 
+  // Draw players
   for(const id in players) {
     const p = players[id];
-    ctx.fillStyle = 'red';
+    ctx.fillStyle = id === myId ? 'blue' : 'red'; // Highlight own player in blue
     console.log(`Player ${id}: x=${p.x}, y=${p.y}, hp=${p.hp}`); // Debug log for player positions and health
+    // Draw square
     // ctx.fillRect(p.x, p.y, 50, 50);
     ctx.fillRect(p.x - player.x + canvas.width/2, p.y - player.y + canvas.height/2, 20, 20);
-
+    // Draw circle
+    const posX = p.x - player.x + canvas.width/2;
+    const posY = p.y - player.y + canvas.height/2;
+    // drawPerson(ctx, posX, posY, p.hp);
   }
   // players.forEach(player => {
   //   const p = players.find(p => p.id === player.id);
@@ -62,6 +77,8 @@ socket.on('state', players => {
   //   ctx.fillRect(p.x, p.y, p.size, p.size);
   //   // ctx.fillRect(player.x, player.y, player.size, player.size);
   // });
+
+
 });
 
 function update() {
@@ -78,3 +95,27 @@ function update() {
   requestAnimationFrame(update);
 }
 update();
+
+
+function drawPerson(ctx, x, y, hp) {
+  ctx.beginPath();
+  // Draw head
+  ctx.arc(x, y, 10, 0, Math.PI * 2);
+  // Draw body shape
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, y + 20);
+  ctx.moveTo(x, y + 10);
+  ctx.lineTo(x - 10, y + 20);
+  ctx.moveTo(x, y + 10);
+  ctx.lineTo(x + 10, y + 20);
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  // Draw health bar
+  drawPersonHealthBar(ctx, x, y, hp); // Example health value, replace with actual player HP if available
+}
+
+function drawPersonHealthBar(ctx, x, y, hp) {
+  ctx.fillStyle = 'green';
+  ctx.fillRect(x - 15, y - 20, (hp / 100) * 30, 5);
+}

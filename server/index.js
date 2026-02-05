@@ -9,26 +9,61 @@ const io = new Server(server);
 
 app.use(express.static("../client"));
 
+const WORLD_SIZE = 3000;
 const players = {};
+const enemies = [
+  // Example enemy data
+  // "enemy1": { x: 500, y: 500, hp: 50 },
+  // "enemy2": { x: 1500, y: 1500, hp: 75 }
+];
+
+// Spawn enemies at random positions within the world
+// for (let i = 0; i < 10; i++) {
+//   const id = `enemy${i}`;
+//   enemies.push({
+//     id: id,
+//     x: Math.floor(Math.random() * WORLD_SIZE),
+//     y: Math.floor(Math.random() * WORLD_SIZE),
+//     hp: 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
+//   });
+// }
+
 
 io.on("connection", socket => {
+  // players[socket.id] = { 
+  //   // Spawn players at random positions within the world
+  //   x: Math.floor(Math.random() * WORLD_SIZE),
+  //   // x: WORLD_SIZE / 2 * Math.random() + WORLD_SIZE / 4,
+  //   y: Math.floor(Math.random() * WORLD_SIZE), 
+  //   // x: 200, y: 200,
+  //   hp: 100 
+  // };
   players[socket.id] = { x: 200, y: 200, hp: 100 };
 
   socket.on("playerInput", dir => {
     const p = players[socket.id];
     if (!p) return;
+
+    // Update player position based on input direction and speed
     p.x += dir.x * 5;
     p.y += dir.y * 5;
+
+    // Keep player within world bounds
+    p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
+    p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
   });
 
   socket.on("disconnect", () => {
+    // Remove player from the game when they disconnect
     delete players[socket.id];
   });
 });
 
+
 setInterval(() => {
   io.emit("state", players);
 }, 1000 / 30);
+
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
