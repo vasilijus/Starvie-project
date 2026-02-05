@@ -28,31 +28,22 @@ const enemies = [
 ];
 
 const keys = {};
+addEventListener("keydown", e => keys[e.key] = true);
+addEventListener("keyup", e => keys[e.key] = false);
 
-window.addEventListener("keydown", e => {
-  keys[e.key] = true;
-});
-
-window.addEventListener("keyup", e => {
-  keys[e.key] = false; // delete keys[e.key];
-});
 
 ctx.fillStyle = "black";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-// Example of listening for messages from the server
-socket.on('chat message', msg => {
-  console.log('Received message from server: ' + msg);
-});
-// socket.emit('chat message', "Test2") // Example of emitting a message to the server
 
-socket.on('privateData', msg => {
-  console.log('Received player data from server: ' + msg);
-});
-// Example of requesting player data from the server
-// socket.emit('p data', "{socket.id}") // Replace {socket.id} with actual socket ID if needed")
+socket.on('state', data => {
+  const { players, enemies: enemyData, worldSize } = data;
 
-socket.on('state', players => {
+  if (players[myId]) {
+    player.x = players[myId].x;
+    player.y = players[myId].y;
+    // player.hp = players[myId].hp;
+  }
 
   player.update();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -71,12 +62,16 @@ socket.on('state', players => {
     const posY = p.y - player.y + canvas.height/2;
     // drawPerson(ctx, posX, posY, p.hp);
   }
-  // players.forEach(player => {
-  //   const p = players.find(p => p.id === player.id);
-  //   ctx.fillStyle = p.color;
-  //   ctx.fillRect(p.x, p.y, p.size, p.size);
-  //   // ctx.fillRect(player.x, player.y, player.size, player.size);
-  // });
+
+  // Draw enemies
+  for(const enemy of enemyData) {
+    const sx = enemy.x - player.x + canvas.width/2;
+    const sy = enemy.y - player.y + canvas.height/2;
+    // console.log(`Enemy ${enemy.id}: x=${enemy.x}, y=${enemy.y}, hp=${enemy.hp}`); // Debug log for enemy positions and health 
+    ctx.fillStyle = 'grey';
+    ctx.fillRect(sx, sy, 20, 20);
+    // drawPerson(ctx, enemy.x - player.x + canvas.width/2, enemy.y - player.y + canvas.height/2, enemy.hp);
+  }
 
 
 });
@@ -119,3 +114,17 @@ function drawPersonHealthBar(ctx, x, y, hp) {
   ctx.fillStyle = 'green';
   ctx.fillRect(x - 15, y - 20, (hp / 100) * 30, 5);
 }
+
+
+
+// Example of listening for messages from the server
+socket.on('chat message', msg => {
+  console.log('Received message from server: ' + msg);
+});
+// socket.emit('chat message', "Test2") // Example of emitting a message to the server
+
+socket.on('privateData', msg => {
+  console.log('Received player data from server: ' + msg);
+});
+// Example of requesting player data from the server
+// socket.emit('p data', "{socket.id}") // Replace {socket.id} with actual socket ID if needed")

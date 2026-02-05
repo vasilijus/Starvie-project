@@ -2,8 +2,10 @@ export class Player {
     constructor(name) {
         this.name = `${name}`;
         // this.id = id;
-        this.x = 100;
-        this.y = 100;
+        // Get spawn position from server or generate randomly
+        
+        // this.x = 100;
+        // this.y = 100;
         this.renderX = 0;
         this.renderY = 0;
         this.size = 50;
@@ -12,6 +14,7 @@ export class Player {
         this.speed = 5;
         this.inventory = [];
         this.equipment = {};
+        this.isAlive = true;
     }
 
     update() {
