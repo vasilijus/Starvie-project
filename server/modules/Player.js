@@ -4,7 +4,7 @@ export class Player {
     this.name = name;
     this.x = x;
     this.y = y;
-    this.size = 10;
+    this.size = 20;
     this.hp = 100;
     this.hpMax = 100;
     this.isAlive = true;
@@ -77,6 +77,7 @@ export class Player {
         console.log(`Leveled Up! Current Level: ${this.level}`);
         // console.log(`Player data: ${this})
         this.increaseDamage(this.damage * 0.5);
+        this.increaseStats();
     }
 d
     calculateNextLevel(lvl) {
@@ -87,6 +88,10 @@ d
         this.damage += strenght;
     }
 
+    increaseStats() {
+        let percent = 5;
+        this.hpMax += percent
+    }
     move(dx, dy) {
         this.x += dx * this.speed;
         this.y += dy * this.speed;
@@ -102,5 +107,10 @@ d
             isAlive: this.isAlive,
             damage: this.damage 
         };
+    }
+
+    move(x, y) {
+        this.x = x;
+        this.y = y;
     }
 }

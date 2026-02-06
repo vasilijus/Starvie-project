@@ -4,6 +4,8 @@ import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE } from "./map/ProceduralMap.js";
 import { Player } from './modules/Player.js';
 import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
+import { generateGUID } from "./util/GUID.js";
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -52,14 +54,14 @@ function getBiome(x, y) {
 // }
 
 function getDistance(x1, y1, x2, y2) {
-    const dx = x1 - x2;
-    const dy = y1 - y2;
-    return Math.sqrt(dx * dx + dy * dy);
+  const dx = x1 - x2;
+  const dy = y1 - y2;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 function spawnResources(x, y) {
   const biome = getBiome(x, y);
-  let {resourceType, icon_color} = {};
+  let { resourceType, icon_color } = {};
   switch (biome) {
     case "forest":
       resourceType = "wood";
@@ -91,7 +93,7 @@ for (let i = 0; i < 100; i++) {
 // Spawn enemies at random positions within the world
 for (let i = 0; i < 101; i++) {
   const id = `enemy${i}`;
-  const hp = 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
+  // const hp = 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
   // enemies.push({
   //   id: id,
   //   x: Math.floor(Math.random() * WORLD_SIZE),
@@ -101,15 +103,18 @@ for (let i = 0; i < 101; i++) {
   // });
   const num = Math.floor(Math.random() * EN_TYPES);
   let mob;
-  switch(num) {
-      case 1:
-        mob = new Wolf(Math.floor(Math.random() * WORLD_SIZE),Math.floor(Math.random() * WORLD_SIZE))
-        break;
-    
-      default:
-        mob = new Bear(Math.floor(Math.random() * WORLD_SIZE),Math.floor(Math.random() * WORLD_SIZE))
-        break;
-    }
+  // const id = generateGUID();
+  const [xPos, yPos] = [Math.floor(Math.random() * WORLD_SIZE) ,Math.floor(Math.random() * WORLD_SIZE)]
+  switch (num) {
+    case 1:
+      mob = new Wolf("w_"+id, xPos, yPos)
+      break;
+
+    default:
+      mob = new Bear("b_"+id, xPos, yPos)
+      break;
+  }
+  console.log(`Mob: ${JSON.stringify(mob)}`)
   enemies.push(
     mob
   )
@@ -162,61 +167,61 @@ io.on("connection", socket => {
 
   socket.on('playerAction', (data) => {
 
-      const player = players[socket.id];
-      if (!player || !player.isAlive) return;
+    const player = players[socket.id];
+    if (!player || !player.isAlive) return;
 
-      const reach = 40; // How far the player reaches
-      const hitRadius = 30; // The size of the "hit" area
+    const reach = 40; // How far the player reaches
+    const hitRadius = 30; // The size of the "hit" area
 
-      
-      // 1. Calculate the exact point in the world the player is "hitting"
-      const hitX = player.x + (data.direction.x * reach);
-      const hitY = player.y + (data.direction.y * reach);
 
-      // 2. Check for Enemies (Combat Logic)
-      // We look for any enemy close to our hit point
-      const hitEnemy = enemies.find(enemy => 
-          getDistance(hitX, hitY, enemy.x, enemy.y) < hitRadius
-      );
+    // 1. Calculate the exact point in the world the player is "hitting"
+    const hitX = player.x + (data.direction.x * reach);
+    const hitY = player.y + (data.direction.y * reach);
 
-      if (hitEnemy) {
-          // Apply damage logic
-          const baseDamage = 10;
-          const multiplier = data.weapon ? 2.5 : 1.0; 
-          const totalDamage = baseDamage * multiplier;
+    // 2. Check for Enemies (Combat Logic)
+    // We look for any enemy close to our hit point
+    const hitEnemy = enemies.find(enemy =>
+      getDistance(hitX, hitY, enemy.x, enemy.y) < hitRadius
+    );
 
-          hitEnemy.hp -= totalDamage;
-          console.log(`Enemy ${hitEnemy.id} hit for ${totalDamage}!`);
-          
-          // Remove enemy if dead
-          if (hitEnemy.hp <= 0) {
-              const index = enemies.indexOf(hitEnemy);
-              enemies.splice(index, 1);
-          }
+    if (hitEnemy) {
+      // Apply damage logic
+      const baseDamage = 10;
+      const multiplier = data.weapon ? 2.5 : 1.0;
+      const totalDamage = baseDamage * multiplier;
 
-          io.emit('hitEffect', {x: hitX, y: hitY, type: 'combat' })
-          return; // Stop here if we hit an enemy
+      hitEnemy.hp -= totalDamage;
+      console.log(`Enemy ${hitEnemy.id} hit for ${totalDamage}!`);
+
+      // Remove enemy if dead
+      if (hitEnemy.hp <= 0) {
+        const index = enemies.indexOf(hitEnemy);
+        enemies.splice(index, 1);
       }
 
-      // 3. Check for Resources (Gathering Logic)
-      // If no enemy was hit, check if we clicked a resource
-      const hitResource = resources.find(res => 
-          getDistance(hitX, hitY, res.x, res.y) < 25
-      );
+      io.emit('hitEffect', { x: hitX, y: hitY, type: 'combat' })
+      return; // Stop here if we hit an enemy
+    }
 
-      if (hitResource) {
-          console.log(`Gathering resource: ${hitResource.type}`);
-          
-          // Logic to give player items
-          if (!player.inventory) player.inventory = [];
-          player.inventory.push(hitResource.type);
+    // 3. Check for Resources (Gathering Logic)
+    // If no enemy was hit, check if we clicked a resource
+    const hitResource = resources.find(res =>
+      getDistance(hitX, hitY, res.x, res.y) < 25
+    );
 
-          // Remove resource from world
-          const resIndex = resources.indexOf(hitResource);
-          resources.splice(resIndex, 1);
+    if (hitResource) {
+      console.log(`Gathering resource: ${hitResource.type}`);
 
-          io.emit('hitEffect', {x: hitX, y: hitY, type: 'gather' })
-      }
+      // Logic to give player items
+      if (!player.inventory) player.inventory = [];
+      player.inventory.push(hitResource.type);
+
+      // Remove resource from world
+      const resIndex = resources.indexOf(hitResource);
+      resources.splice(resIndex, 1);
+
+      io.emit('hitEffect', { x: hitX, y: hitY, type: 'gather' })
+    }
   });
 
   socket.on("disconnect", () => {
@@ -247,7 +252,7 @@ setInterval(() => {
 
     if (alivePlayers.length === 0) continue; // Skip if no alive players
     else {
-        
+
       for (const p of alivePlayers) {
         const dx = p.x - enemy.x;
         const dy = p.y - enemy.y;
@@ -258,31 +263,62 @@ setInterval(() => {
         }
       }
     }
-    
+
     const huntRange = 200; // Distance at which enemies will start chasing players
-    if (distance < huntRange) {
-      // Move towards the closest player
+    if (distance < huntRange && closestPlayer) {
+      // Calculate new position
       const angle = Math.atan2(closestPlayer.y - enemy.y, closestPlayer.x - enemy.x);
-      enemy.x += Math.cos(angle) * 2; // Enemy speed
-      enemy.y += Math.sin(angle) * 2;
+      const newX = enemy.x + Math.cos(angle) * 2; // Enemy speed
+      const newY = enemy.y + Math.sin(angle) * 2;
+
+      // Check collision with closest player (20px collision radius: 10 for enemy + 10 for player)
+      const collisionDistance = 20;
+      const dx = newX - closestPlayer.x;
+      const dy = newY - closestPlayer.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Only move if no collision
+      if (dist > collisionDistance) {
+        enemy.x = newX;
+        enemy.y = newY;
+      }
+      // Otherwise enemy stops (doesn't move)
     } else {
-      // Make enemies move randomly if no player is nearby, but in a more natural way, following a more linear path instead of jittery random movement
-      if (!enemy.moveDirection || Math.random() < 0.01) { // Change direction randomly every 100 frames on average
+      // Random movement with same collision check
+      if (!enemy.moveDirection || Math.random() < 0.01) {
         const angle = Math.random() * 2 * Math.PI;
         enemy.moveDirection = { x: Math.cos(angle), y: Math.sin(angle) };
       }
-      enemy.x += enemy.moveDirection.x * 1; // Slower random movement
-      enemy.y += enemy.moveDirection.y * 1;
+      const newX = enemy.x + enemy.moveDirection.x * 1;
+      const newY = enemy.y + enemy.moveDirection.y * 1;
 
+      // Check collision with all alive players
+      let canMove = true;
+      for (const p of alivePlayers) {
+        const collisionDistance = 20; // 10px each
+        const dx = newX - p.x;
+        const dy = newY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist <= collisionDistance) {
+          canMove = false;
+          break;
+        }
+      }
+
+      if (canMove) {
+        enemy.x = newX;
+        enemy.y = newY;
+      }
     }
 
     // Keep enemy within world bounds
     enemy.x = Math.max(0, Math.min(WORLD_SIZE, enemy.x));
     enemy.y = Math.max(0, Math.min(WORLD_SIZE, enemy.y));
 
-    
+
     // Check if player HP is reduced to 0 or below and remove player from the game
     if (closestPlayer && closestPlayer.hp <= 0) {
+      console.log('collision')
       // Find the player ID to remove from the players object
       for (const id in players) {
         if (players[id] === closestPlayer) {
@@ -293,33 +329,34 @@ setInterval(() => {
         }
       }
     }
-    
+
     // Enemies attack player if close enough
     // Check for collisions with players and reduce HP
-    const dx = closestPlayer.x - enemy.x;
-    const dy = closestPlayer.y - enemy.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 20) { // Collision radius
-      // console.log(`Enemy ${enemy.id} attacks player for 1 damage!`);
+    if (closestPlayer) {
+      const dx = closestPlayer.x - enemy.x;
+      const dy = closestPlayer.y - enemy.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const attackRange = 25; // Range at which enemy deals damage
 
-      closestPlayer.takeDamage(1); // Reduce player HP using the Player class method
-      // closestPlayer.hp -= 1; // Reduce player HP
-      enemy.hp -= closestPlayer.damage; // Reduce enemy aHP
-      if (enemy.hp <= 0) {
-        enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
-        closestPlayer.addXP(enemy.xpWorth);
-        // console.log(`Player Stats: lvl: ${closestPlayer.xp},dmg: ${closestPlayer.damage}`)
-
+      if (dist < attackRange) {
+        // Attack once per second (every 30 frames at 30 FPS)
+        if (!enemy.lastAttackTime) enemy.lastAttackTime = 0;
+        const now = Date.now();
+        if (now - enemy.lastAttackTime > 1000) { // 1 second cooldown
+          closestPlayer.takeDamage(10); // Enemy damage per hit
+          enemy.lastAttackTime = now;
+          console.log(`Enemy ${enemy.id} attacks player! Player HP: ${closestPlayer.hp}`);
+        }
       }
     }
-
-
   }
+
 
   // Broadcast updated game state to all clients
   const statePlayers = Object.fromEntries(
     Object.entries(players).map(([id, p]) => [id, p.toClient()])
   );
+
   io.emit("state", { players: statePlayers, enemies, world, resources });
 }, 1000 / 30);
 

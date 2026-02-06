@@ -20,7 +20,7 @@ export default class Renderer {
             const sx = p.x - this.player.x + this.canvas.width / 2;
             const sy = p.y - this.player.y + this.canvas.height / 2;
             ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
-            ctx.fillRect(sx, sy, 20, 20);
+            ctx.fillRect(sx, sy, this.player.size, this.player.size);
             if(p.hp < p.hpMax)
                 this.drawHealth(ctx, sx, sy, p.hp);
         }
@@ -36,7 +36,7 @@ export default class Renderer {
             const sy = enemy.y - this.player.y + this.canvas.height / 2;
             // ctx.fillStyle = 'grey';
             ctx.fillStyle = enemy.color;
-            ctx.fillRect(sx, sy, 20, 20);
+            ctx.fillRect(sx, sy, enemy.size, enemy.size );
             if(enemy.hp < enemy.hpMax)
                 this.drawHealth(ctx, sx, sy, enemy.hp);
         }
@@ -130,4 +130,5 @@ export default class Renderer {
         ctx.lineTo(endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
         ctx.closePath();
         ctx.fill();
-    }}
+    }
+}
