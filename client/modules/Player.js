@@ -9,8 +9,7 @@ export class Player {
         // this.y = 100;
         this.renderX = 0;
         this.renderY = 0;
-        this.size = 50;
-        this.color = 'red'; 
+        this.size = 10;
         this.health = 100;
         this.maxHealth = 100;
         this.speed = 5;

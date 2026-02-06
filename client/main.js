@@ -52,7 +52,7 @@ playBtn.addEventListener('click', () => {
       player.activeEffects.push({
           x: effectData.x,
           y: effectData.y,
-          life: 100.0, 
+          life: 1.0, 
           decay: 0.05, // Controls how fast it vanishes
           type: effectData.type
       });

@@ -4,6 +4,7 @@ export class Player {
     this.name = name;
     this.x = x;
     this.y = y;
+    this.size = 10;
     this.hp = 100;
     this.hpMax = 100;
     this.isAlive = true;

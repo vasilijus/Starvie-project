@@ -17,5 +17,6 @@ export class Bear extends Enemy {
     this.hp = this.hpMax = 75;
     this.color = '#4a1500'
     this.xpWorth = 2;
+    this.size = 15;
   }
 }
