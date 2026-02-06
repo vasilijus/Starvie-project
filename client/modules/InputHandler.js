@@ -26,15 +26,27 @@ export default class InputHandler {
   handleClick(e) {
     const clickX = this.player.x - this.canvas.width / 2 + e.clientX;
     const clickY = this.player.y - this.canvas.height / 2 + e.clientY;
+
     const dx = clickX - this.player.x;
     const dy = clickY - this.player.y;
+
     const len = Math.hypot(dx, dy);
     if (len === 0) return;
+
     const norm = { x: dx / len, y: dy / len };
+
     // Store the facing direction in player
     this.player.facingDirection = norm;
     const equipment = this.player.equipment || 'none';
     const type = (equipment === 'sword' || equipment === 'axe') ? 'attack' : 'interact';
-    this.network.emit('playerAction', { type, direction: norm, item: equipment });
+
+    this.network.emit('playerAction', 
+      { 
+        // player: this.player.id,
+        type, 
+        direction: norm, 
+        item: equipment 
+      }
+    );
   }
 }

@@ -114,10 +114,9 @@ for (let i = 0; i < 101; i++) {
       mob = new Bear("b_"+id, xPos, yPos)
       break;
   }
-  console.log(`Mob: ${JSON.stringify(mob)}`)
-  enemies.push(
-    mob
-  )
+
+  // console.log(`Mob: ${JSON.stringify(mob)}`)
+  enemies.push( mob )
 }
 
 
@@ -186,17 +185,23 @@ io.on("connection", socket => {
 
     if (hitEnemy) {
       // Apply damage logic
-      const baseDamage = 10;
+      const baseDamage = player.damage;
       const multiplier = data.weapon ? 2.5 : 1.0;
       const totalDamage = baseDamage * multiplier;
 
       hitEnemy.hp -= totalDamage;
-      console.log(`Enemy ${hitEnemy.id} hit for ${totalDamage}!`);
+      console.log(`Player hit ${hitEnemy.id} for ${totalDamage} dmg! (x:${player.x}/y:${player.y})`);
 
       // Remove enemy if dead
       if (hitEnemy.hp <= 0) {
         const index = enemies.indexOf(hitEnemy);
         enemies.splice(index, 1);
+
+        // Player gains experience
+        // player.addXp(hitEnemy.xpWorth)
+        player.addXP(hitEnemy.xpWorth)
+        // console.log(`ADD EXP`)
+        // console.log(player)
       }
 
       io.emit('hitEffect', { x: hitX, y: hitY, type: 'combat' })
@@ -214,7 +219,10 @@ io.on("connection", socket => {
 
       // Logic to give player items
       if (!player.inventory) player.inventory = [];
-      player.inventory.push(hitResource.type);
+      // player.inventory.push(hitResource.type);
+      player.gatherResource(hitResource.type)
+
+      console.log(`Player: ${player.id} bag: ${player.inventory}`)
 
       // Remove resource from world
       const resIndex = resources.indexOf(hitResource);
@@ -229,6 +237,7 @@ io.on("connection", socket => {
     delete players[socket.id];
   });
 });
+
 
 // Broadcast game state to all clients at 30 FPS
 setInterval(() => {
@@ -341,11 +350,12 @@ setInterval(() => {
       if (dist < attackRange) {
         // Attack once per second (every 30 frames at 30 FPS)
         if (!enemy.lastAttackTime) enemy.lastAttackTime = 0;
+        
         const now = Date.now();
         if (now - enemy.lastAttackTime > 1000) { // 1 second cooldown
-          closestPlayer.takeDamage(10); // Enemy damage per hit
+          closestPlayer.takeDamage(10); // Enemy damage per hita
           enemy.lastAttackTime = now;
-          console.log(`Enemy ${enemy.id} attacks player! Player HP: ${closestPlayer.hp}`);
+          console.log(`Enemy ${enemy.id} attacks player! ${(closestPlayer.name ?? closestPlayer.name) || closestPlayer.id } HP: ${closestPlayer.hp} (x:${Math.floor(enemy.x)}/y:${Math.floor(enemy.y)})`);
         }
       }
     }
@@ -372,3 +382,15 @@ const checkIfPlayerAlive = (person) => {
   }
   return true;
 }
+
+/**
+ * 
+ * Enemy w_enemy57 hit for 10!
+Enemy w_enemy57 hit for 10!
+Enemy w_enemy57 hit for 10!
+Enemy w_enemy57 attacks player! Player HP: 80
+Enemy w_enemy57 attacks player! Player HP: 70
+Enemy w_enemy57 hit for 10!
+Healed... 100
+
+ */

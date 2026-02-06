@@ -12,7 +12,7 @@ export class Player {
     this.regenTimer = null;
     this.regenInterval = null;
     this.speed = 5;
-    this.damage = 1;
+    this.damage = 10;
     this.healSpeed = 1;
     this.level = 1;
     this.xp = 0;
@@ -79,7 +79,7 @@ export class Player {
         this.increaseDamage(this.damage * 0.5);
         this.increaseStats();
     }
-d
+
     calculateNextLevel(lvl) {
         return lvl * 2;
     }
@@ -107,6 +107,14 @@ d
             isAlive: this.isAlive,
             damage: this.damage 
         };
+    }
+
+    gatherResource(item) {
+        if (!this.inventory) this.inventory = [];
+        if (!this.inventory.item)
+            this.inventory.item = 0;
+        
+        this.inventory.item += 1;
     }
 
     move(x, y) {

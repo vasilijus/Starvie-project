@@ -49,6 +49,7 @@ playBtn.addEventListener('click', () => {
   network.on('hitEffect', (effectData) => {
       // REMOVE THIS LINE: player.activeEffects = [] 
       // console.log('Hit effect added at:', effectData.x, effectData.y);
+      console.log(`hitEffect: ${effectData.type}. x:${effectData.x}, y:${effectData.y}`)
       player.activeEffects.push({
           x: effectData.x,
           y: effectData.y,
