@@ -9,7 +9,14 @@ export class Player {
     this.lastDamageTime = 0;
     this.regenTimer = null;
     this.regenInterval = null;
+    this.regenHealBegin = 5000;
     this.speed = 5;
+    this.damage = 1;
+    this.healSpeed = 1;
+    this.level = 1;
+    this.xp = 0;
+    this.xpToNext = 2;
+    
   }
 
 //   takeDamage(amount) {
@@ -29,30 +36,54 @@ export class Player {
         // 2. Start a new 5-second "no-damage" wait
         this.regenTimer = setTimeout(() => {
             this.startHealing();
-        }, 5000)
-        // if (this.hp <= 0) {
-        //     this.hp = 0;
-        //     this.isAlive = false;
-        //     console.log(`${this.name} has died.`);
-        //     // Handle player death (e.g., respawn, drop inventory, etc.)
-        // } else {
-        //     console.log(`${this.name} took ${amount} damage, hp is now ${this.hp}.`);
-        // }
+        }, this.regenHealBegin)
+
     }
 
     startHealing() {
-        console.log('Starting regeneration')
+        // console.log('Starting regeneration')
 
         // 3 Tick health every 100ms
         this.regenInterval = setInterval(() => {
             if(this.hp < this.hpMax) {
-                this.hp += 1;
-                console.log(`Healing... ${this.hp}`);
+                this.hp += this.healSpeed;
+                if (this.hp % 20 === 0) {
+                    console.log(`Healing... ${this.hp}%`);
+                }
             } else {
                 // Stop once hp i full
+                console.log(`Healed... ${this.hp}`);
                 clearInterval(this.regenInterval);
             }
-        }, 100)
+        }, 1000) // hp per second
+    }
+
+    addXP(ammount) {
+        this.xp += ammount;
+
+        // Use 'while' in case they gain enough XP for multiple levels
+        while(this.xp >= this.xpToNext) {
+            this.levelUp();
+        }
+    }
+
+    levelUp() {
+        this.xp -= this.xpToNext; // Keep leftover XP
+        this.level++;
+        
+        // Update the threshold using a formula (see below)
+        this.xpToNext = this.calculateNextLevel(this.xpToNext);
+        console.log(`Leveled Up! Current Level: ${this.level}`);
+        console.log(this)
+        this.increaseDamage(this.damage * 0.5);
+    }
+d
+    calculateNextLevel(lvl) {
+        return lvl * 2;
+    }
+
+    increaseDamage(strenght) {
+        this.damage += strenght;
     }
 
     move(dx, dy) {
@@ -61,6 +92,14 @@ export class Player {
     }
 
     toClient() {
-        return { id: this.id, x: this.x, y: this.y, hp: this.hp, isAlive: this.isAlive };
+        return { 
+            id: this.id,
+            x: this.x,
+            y: this.y,
+            hp: this.hp,
+            hpMax: this.hpMax,
+            isAlive: this.isAlive,
+            damage: this.damage 
+        };
     }
 }

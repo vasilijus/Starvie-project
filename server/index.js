@@ -3,7 +3,7 @@ import http from "http";
 import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE } from "./map/ProceduralMap.js";
 import { Player } from './modules/Player.js';
-
+import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -91,12 +91,28 @@ for (let i = 0; i < 100; i++) {
 // Spawn enemies at random positions within the world
 for (let i = 0; i < 101; i++) {
   const id = `enemy${i}`;
-  enemies.push({
-    id: id,
-    x: Math.floor(Math.random() * WORLD_SIZE),
-    y: Math.floor(Math.random() * WORLD_SIZE),
-    hp: 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
-  });
+  const hp = 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
+  // enemies.push({
+  //   id: id,
+  //   x: Math.floor(Math.random() * WORLD_SIZE),
+  //   y: Math.floor(Math.random() * WORLD_SIZE),
+  //   hp: hp,
+  //   hpMax: hp 
+  // });
+  const num = Math.floor(Math.random() * EN_TYPES);
+  let mob;
+  switch(num) {
+      case 1:
+        mob = new Wolf(Math.floor(Math.random() * WORLD_SIZE),Math.floor(Math.random() * WORLD_SIZE))
+        break;
+    
+      default:
+        mob = new Bear(Math.floor(Math.random() * WORLD_SIZE),Math.floor(Math.random() * WORLD_SIZE))
+        break;
+    }
+  enemies.push(
+    mob
+  )
 }
 
 
@@ -135,12 +151,14 @@ io.on("connection", socket => {
   });
 
   socket.on('playerAction', (data) => {
+
       const player = players[socket.id];
       if (!player || !player.isAlive) return;
 
       const reach = 40; // How far the player reaches
       const hitRadius = 30; // The size of the "hit" area
 
+      
       // 1. Calculate the exact point in the world the player is "hitting"
       const hitX = player.x + (data.direction.x * reach);
       const hitY = player.y + (data.direction.y * reach);
@@ -268,12 +286,16 @@ setInterval(() => {
     const dy = closestPlayer.y - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 20) { // Collision radius
-      console.log(`Enemy ${enemy.id} attacks player for 1 damage!`);
+      // console.log(`Enemy ${enemy.id} attacks player for 1 damage!`);
+
       closestPlayer.takeDamage(1); // Reduce player HP using the Player class method
       // closestPlayer.hp -= 1; // Reduce player HP
-      enemy.hp -= 1; // Reduce enemy aHP
+      enemy.hp -= closestPlayer.damage; // Reduce enemy aHP
       if (enemy.hp <= 0) {
         enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
+        closestPlayer.addXP(enemy.xpWorth);
+        console.log(`Player Stats: lvl: ${closestPlayer.xp},dmg: ${closestPlayer.damage}`)
+
       }
     }
 
