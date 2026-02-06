@@ -31,6 +31,8 @@ export default class InputHandler {
     const len = Math.hypot(dx, dy);
     if (len === 0) return;
     const norm = { x: dx / len, y: dy / len };
+    // Store the facing direction in player
+    this.player.facingDirection = norm;
     const equipment = this.player.equipment || 'none';
     const type = (equipment === 'sword' || equipment === 'axe') ? 'attack' : 'interact';
     this.network.emit('playerAction', { type, direction: norm, item: equipment });

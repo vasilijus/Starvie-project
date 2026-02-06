@@ -1,5 +1,6 @@
 export class Player {
-    constructor(name) {
+    constructor(id, name) {
+        this.id = id
         this.name = `${name}`;
         // this.id = id;
         // Get spawn position from server or generate randomly
@@ -24,12 +25,14 @@ export class Player {
         this.regenDelay = 5000; // Time in ms before health starts regenerating after taking damage
         this.lastDamageTime = 0; // Timestamp of the last time the player took damage   
         this.isAlive = true;
+        this.facingDirection = { x: 0, y: -1 }; // Direction player is facing (normalized)
     }
 
     update() {
         // Smoothly interpolate render position towards actual position for better visuals
         this.renderX += (this.x - this.renderX) * 0.1;
         this.renderY += (this.y - this.renderY) * 0.1;
+        // alert('test')
     }
 
     // takeDamage(amount) {

@@ -1,6 +1,7 @@
 export class Player {
-  constructor(id, x = 0, y = 0) {
+  constructor(id, name, x = 0, y = 0) {
     this.id = id;
+    this.name = name;
     this.x = x;
     this.y = y;
     this.hp = 100;
@@ -9,7 +10,6 @@ export class Player {
     this.lastDamageTime = 0;
     this.regenTimer = null;
     this.regenInterval = null;
-    this.regenHealBegin = 5000;
     this.speed = 5;
     this.damage = 1;
     this.healSpeed = 1;
@@ -36,7 +36,7 @@ export class Player {
         // 2. Start a new 5-second "no-damage" wait
         this.regenTimer = setTimeout(() => {
             this.startHealing();
-        }, this.regenHealBegin)
+        }, 5000)
 
     }
 
@@ -47,9 +47,9 @@ export class Player {
         this.regenInterval = setInterval(() => {
             if(this.hp < this.hpMax) {
                 this.hp += this.healSpeed;
-                if (this.hp % 20 === 0) {
-                    console.log(`Healing... ${this.hp}%`);
-                }
+                // if (this.hp % 20 === 0) {
+                //     console.log(`Healing... ${this.hp}%`);
+                // }
             } else {
                 // Stop once hp i full
                 console.log(`Healed... ${this.hp}`);
@@ -74,7 +74,7 @@ export class Player {
         // Update the threshold using a formula (see below)
         this.xpToNext = this.calculateNextLevel(this.xpToNext);
         console.log(`Leveled Up! Current Level: ${this.level}`);
-        console.log(this)
+        // console.log(`Player data: ${this})
         this.increaseDamage(this.damage * 0.5);
     }
 d

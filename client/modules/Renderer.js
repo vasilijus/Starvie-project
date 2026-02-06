@@ -25,6 +25,11 @@ export default class Renderer {
                 this.drawHealth(ctx, sx, sy, p.hp);
         }
 
+        // Draw player direction line (from center of player square)
+        const playerScreenX = this.canvas.width / 2;
+        const playerScreenY = this.canvas.height / 2;
+        this.drawDirectionLine(ctx, playerScreenX, playerScreenY, this.player.facingDirection);
+
         // enemies
         for (const enemy of enemies) {
             const sx = enemy.x - this.player.x + this.canvas.width / 2;
@@ -35,6 +40,7 @@ export default class Renderer {
             if(enemy.hp < enemy.hpMax)
                 this.drawHealth(ctx, sx, sy, enemy.hp);
         }
+        
 
         // resources
         for (const r of resources) {
@@ -43,6 +49,44 @@ export default class Renderer {
             ctx.fillStyle = r.icon_color || 'green';
             ctx.fillRect(sx, sy, 10, 10);
         }
+
+        // Draw Effects
+        this.player.activeEffects.forEach((effect, index) => {
+            // 1. Calculate Screen Position
+            // Subtract the world camera offset so the circle "sticks" to the ground
+            const screenX = effect.x - (this.player.x - this.canvas.width / 2);
+            const screenY = effect.y - (this.player.y - this.canvas.height / 2);
+
+            // 2. Draw using the NEW screen coordinates
+            this.ctx.beginPath();
+            const radius = (1.2 - effect.life) * 50; // Expands as it fades
+            this.ctx.arc(screenX, screenY, 20, 0, Math.PI * 2);
+            
+            // this.ctx.arc(effect.x, effect.y, 20, 0, Math.PI * 2);
+
+
+            this.ctx.strokeStyle = effect.type === 'combat' 
+                ? `rgba(255, 0, 0, ${effect.life})` 
+                : `rgba(0, 255, 0, ${effect.life})`;
+            
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // 3. Update & Cleanup
+            effect.life -= effect.decay || 0.05;
+            if (effect.life <= 0) this.player.activeEffects.splice(index, 1);
+            
+            this.ctx.fillStyle = effect.type === 'combat' ? `rgba(255,0,0,${effect.life})` : `rgba(0,255,0,${effect.life})`; // Choose a color that stands out
+            this.ctx.font = "22px Arial"; // Set size and font
+            this.ctx.textAlign = "left";  // Align text to the start of your coordinates
+            // Use fillText(text, x, y) to place it next to the bar
+            // (x + 30) moves it just past the end of a full 100% bar
+            this.ctx.fillText('combat', effect.x,effect.y); 
+
+            // Remove dead effects
+            if (effect.life <= 0) this.player.activeEffects.splice(index, 1);
+        });
+
     }
 
     drawHealth(ctx, x, y, hp = 100) {
@@ -63,4 +107,27 @@ export default class Renderer {
         // (x + 30) moves it just past the end of a full 100% bar
         ctx.fillText(Math.floor(hp), x +2, y - 25); 
     }
-}
+    drawDirectionLine(ctx, centerX, centerY, direction) {
+        if (!direction) return;
+        const length = 30; // Length of the direction line
+        const endX = centerX + direction.x * length;
+        const endY = centerY + direction.y * length;
+        
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        
+        // Draw arrowhead
+        const arrowSize = 8;
+        const angle = Math.atan2(direction.y, direction.x);
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - arrowSize * Math.cos(angle - Math.PI / 6), endY - arrowSize * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+    }}

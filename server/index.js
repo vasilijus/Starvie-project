@@ -123,6 +123,16 @@ io.on("connection", socket => {
     Math.floor(Math.random() * WORLD_SIZE)
   );
 
+
+  socket.on("playerJoin", (data) => {
+    const p = players[socket.id];
+    if (p && data.name) {
+      p.name = data.name;
+      console.log(`Player ${socket.id} joined as: ${p.name}`);
+    }
+  });
+
+
   socket.on("playerInput", dir => {
     const p = players[socket.id];
     if (!p) return;
@@ -183,6 +193,8 @@ io.on("connection", socket => {
               const index = enemies.indexOf(hitEnemy);
               enemies.splice(index, 1);
           }
+
+          io.emit('hitEffect', {x: hitX, y: hitY, type: 'combat' })
           return; // Stop here if we hit an enemy
       }
 
@@ -202,6 +214,8 @@ io.on("connection", socket => {
           // Remove resource from world
           const resIndex = resources.indexOf(hitResource);
           resources.splice(resIndex, 1);
+
+          io.emit('hitEffect', {x: hitX, y: hitY, type: 'gather' })
       }
   });
 
@@ -294,7 +308,7 @@ setInterval(() => {
       if (enemy.hp <= 0) {
         enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
         closestPlayer.addXP(enemy.xpWorth);
-        console.log(`Player Stats: lvl: ${closestPlayer.xp},dmg: ${closestPlayer.damage}`)
+        // console.log(`Player Stats: lvl: ${closestPlayer.xp},dmg: ${closestPlayer.damage}`)
 
       }
     }
