@@ -2,7 +2,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE, setHandmadeMap} from "./map/ProceduralMap.js";
-import { Player } from './modules/Player.js';
+import { ServerPlayer } from './modules/ServerPlayer.js';
 import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
 import { generateGUID } from "./util/GUID.js";
 import fs from "fs";
@@ -104,8 +104,9 @@ for (let i = 0; i < 20; i++) {
 
 
 io.on("connection", socket => {
-  players[socket.id] = new Player(
+  players[socket.id] = new ServerPlayer(
     socket.id,
+    `Player_${socket.id.substring(0, 8)}`,
     Math.floor(Math.random() * WORLD_SIZE),
     Math.floor(Math.random() * WORLD_SIZE)
   );

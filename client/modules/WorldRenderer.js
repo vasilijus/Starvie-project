@@ -24,11 +24,9 @@ export class WorldRenderer {
             return;
         }
 
-        // Use renderX/renderY only if they're finite numbers; otherwise fall back to player.x/y
-        const px = Number.isFinite(player?.renderX) ? player.renderX
-                 : Number.isFinite(player?.x) ? player.x : 0;
-        const py = Number.isFinite(player?.renderY) ? player.renderY
-                 : Number.isFinite(player?.y) ? player.y : 0;
+        // Use player position directly
+        const px = player?.x || 0;
+        const py = player?.y || 0;
 
         const canvasWidth = ctx.canvas.width;
         const canvasHeight = ctx.canvas.height;
