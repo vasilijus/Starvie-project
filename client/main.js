@@ -1,130 +1,115 @@
-import { Player } from "./modules/Player.js";
-import { World } from "./modules/World.js";
-
-const socket = io();
-let myId = null;
-socket.on('connect', () => {
-  myId = socket.id;
-  console.log(`Connected to server with ID: ${myId}`);
-});
-
-console.log('Client connected to server');
-console.log(socket.id); // Log the socket ID
+import { ClientPlayer } from "./modules/ClientPlayer.js";
+import { WorldRenderer } from "./modules/WorldRenderer.js";
+import Network from "./modules/Network.js";
+import InputHandler from "./modules/InputHandler.js";
+import Renderer from "./modules/Renderer.js";
+import { MapEditor } from "./modules/MapEditor.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// const player = new Player("Player", socket.id);
-const player = new Player("Player");
-const world = new World();
-// world.addPlayer(player);
-const enemies = [
-  // Example enemy data
-  // { id: "enemy1", x: 500, y: 500, hp: 50 },
-  // { id: "enemy2", x: 1500, y: 1500, hp: 75 }
-];
-
-const keys = {};
-addEventListener("keydown", e => keys[e.key] = true);
-addEventListener("keyup", e => keys[e.key] = false);
 
 
-ctx.fillStyle = "black";
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+// Landing page elements
+const landing = document.getElementById("landing");
+const socketIdSpan = document.getElementById("socketId");
+const playerNameInput = document.getElementById("playerName");
+const playBtn = document.getElementById("playBtn");
+
+// Initialize network
+const network = new Network();
+// console.log("Network initialized with ID:", network);
+// const player = new Player(`Player_${network.id}`);
 
 
-socket.on('state', data => {
-  const { players, enemies: enemyData, worldSize } = data;
-
-  if (players[myId]) {
-    player.x = players[myId].x;
-    player.y = players[myId].y;
-    // player.hp = players[myId].hp;
-  }
-
-  player.update();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  world.draw(ctx, player);
-
-  // Draw players
-  for(const id in players) {
-    const p = players[id];
-    ctx.fillStyle = id === myId ? 'blue' : 'red'; // Highlight own player in blue
-    console.log(`Player ${id}: x=${p.x}, y=${p.y}, hp=${p.hp}`); // Debug log for player positions and health
-    // Draw square
-    // ctx.fillRect(p.x, p.y, 50, 50);
-    ctx.fillRect(p.x - player.x + canvas.width/2, p.y - player.y + canvas.height/2, 20, 20);
-    // Draw circle
-    const posX = p.x - player.x + canvas.width/2;
-    const posY = p.y - player.y + canvas.height/2;
-    // drawPerson(ctx, posX, posY, p.hp);
-  }
-
-  // Draw enemies
-  for(const enemy of enemyData) {
-    const sx = enemy.x - player.x + canvas.width/2;
-    const sy = enemy.y - player.y + canvas.height/2;
-    // console.log(`Enemy ${enemy.id}: x=${enemy.x}, y=${enemy.y}, hp=${enemy.hp}`); // Debug log for enemy positions and health 
-    ctx.fillStyle = 'grey';
-    ctx.fillRect(sx, sy, 20, 20);
-    // drawPerson(ctx, enemy.x - player.x + canvas.width/2, enemy.y - player.y + canvas.height/2, enemy.hp);
-  }
-
-
+// Wait for socket connection
+network.on('connect', () => {
+  // console.log("Socket connected:", network.id);
+  socketIdSpan.textContent = network.id;
+  playBtn.disabled = false; // Enable play button once connected
 });
 
-function update() {
-  let direction = { x: 0, y: 0 };
+// Play button handler
+let gameStarted = false;
+playBtn.addEventListener('click', () => {
+  const playerName = playerNameInput.value.trim() || `Player_${network.id.substring(0, 8)}`;
+  const playerID = document.getElementById('socketId').textContent
 
-  if (keys['w']) direction.y += -1;
-  if (keys['s']) direction.y += 1;
-  if (keys['a']) direction.x += -1;
-  if (keys['d']) direction.x += 1;
+  console.log("Starting game with player name:", playerName);
 
-  // Example of sending player input to the server
-  socket.emit('playerInput', direction);
+  // Hide landing page
+  landing.classList.add('hidden');
 
-  requestAnimationFrame(update);
-}
-update();
+  // Initialize player with entered name
+  const player = new ClientPlayer(playerID, playerName);
 
+  player.activeEffects = []; // Initialize effects array
 
-function drawPerson(ctx, x, y, hp) {
-  ctx.beginPath();
-  // Draw head
-  ctx.arc(x, y, 10, 0, Math.PI * 2);
-  // Draw body shape
-  ctx.moveTo(x, y);
-  ctx.lineTo(x, y + 20);
-  ctx.moveTo(x, y + 10);
-  ctx.lineTo(x - 10, y + 20);
-  ctx.moveTo(x, y + 10);
-  ctx.lineTo(x + 10, y + 20);
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  // Draw health bar
-  drawPersonHealthBar(ctx, x, y, hp); // Example health value, replace with actual player HP if available
-}
+  network.on('hitEffect', (effectData) => {
+      // REMOVE THIS LINE: player.activeEffects = [] 
+      // console.log('Hit effect added at:', effectData.x, effectData.y);
+      console.log(`hitEffect: ${effectData.type}. x:${effectData.x}, y:${effectData.y}`)
+      player.activeEffects.push({
+          x: effectData.x,
+          y: effectData.y,
+          life: 1.0, 
+          decay: 0.05, // Controls how fast it vanishes
+          type: effectData.type
+      });
+  });
 
-function drawPersonHealthBar(ctx, x, y, hp) {
-  ctx.fillStyle = 'green';
-  ctx.fillRect(x - 15, y - 20, (hp / 100) * 30, 5);
-}
+  // Send player name to server
+  network.emit('playerJoin', { name: playerName });
 
 
+  // Initialize game components
+  const worldRenderer = new WorldRenderer();
+  const mapEditor = new MapEditor(canvas, ctx, player, worldRenderer, network);
 
-// Example of listening for messages from the server
-socket.on('chat message', msg => {
-  console.log('Received message from server: ' + msg);
+  const renderer = new Renderer(canvas, ctx, player, worldRenderer, mapEditor);
+
+  const input = new InputHandler(canvas, player, network, mapEditor);
+
+  console.log("Renderer initialized with player:", player);
+  console.log("InputHandler initialized with canvas", canvas);
+  
+  // Initialize world in editor (will be set once on first state update)
+  let worldInitialized = false;
+    
+  // Receive authoritative state and hand to renderer
+  network.on('state', data => {
+    const { players, enemies, worldSize, resources } = data;
+    // Initialize world once, then only update if NOT in editor mode
+    if (!worldInitialized) {
+      mapEditor.setWorld(data.world);
+      worldInitialized = true;
+    } else if (!mapEditor.isActive) {
+      // Only overwrite world data if not actively editing
+      mapEditor.setWorld(data.world);
+    }
+    if (players[network.id]) {
+      player.syncFromServer(players[network.id]);
+    }
+    renderer.render(data);
+  });
+
+  // Game loop
+  function loop() {
+    player.update();
+    requestAnimationFrame(loop);
+  }
+  gameStarted = true;
+  loop();
 });
-// socket.emit('chat message', "Test2") // Example of emitting a message to the server
 
-socket.on('privateData', msg => {
-  console.log('Received player data from server: ' + msg);
+
+// Allow Enter key to trigger play
+playerNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !playBtn.disabled) {
+    playBtn.click();
+  }
 });
-// Example of requesting player data from the server
-// socket.emit('p data', "{socket.id}") // Replace {socket.id} with actual socket ID if needed")
+
+// addEventListener()
