@@ -5,6 +5,7 @@ import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE, setHandmadeMap} fro
 import { ServerPlayer } from './modules/ServerPlayer.js';
 import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
 import { generateGUID } from "./util/GUID.js";
+import { ResourceFactory } from "./modules/resources/ResourceFactory.js";
 import fs from "fs";
 import path from "path";
 
@@ -39,18 +40,28 @@ app.use(express.static("../client"));
 const world = generateWorld();
 console.log(`World initialized with chunks: ${Object.keys(world.chunks).length}`);
 
-// Load resources from world chunks
+// Load resources from world chunks using ResourceFactory
 function loadResourcesFromChunks() {
   const loadedResources = [];
   for (const key in world.chunks) {
     const chunk = world.chunks[key];
     if (chunk.resources && Array.isArray(chunk.resources)) {
-      // Add icon_color if not present
-      for (const resource of chunk.resources) {
-        resource.id = `resource_${key}_${loadedResources.length}`;
-        resource.hp = resource.hp || 100;
-        resource.hpMax = resource.hpMax || 100;
-        loadedResources.push(resource);
+      // Create instances using ResourceFactory
+      for (const resourceData of chunk.resources) {
+        try {
+          const resource = ResourceFactory.createResource(
+            resourceData.type,
+            resourceData.x,
+            resourceData.y
+          );
+          // Override icon color if provided
+          if (resourceData.icon_color) {
+            resource.icon_color = resourceData.icon_color;
+          }
+          loadedResources.push(resource);
+        } catch (err) {
+          console.warn(`Failed to create resource of type ${resourceData.type}: ${err.message}`);
+        }
       }
     }
   }
@@ -66,6 +77,7 @@ const enemies = [
   // "enemy2": { x: 1500, y: 1500, hp: 75 }
 ];
 const resources = loadResourcesFromChunks();
+const enemyDrops = []; // Track drops from defeated enemies
 
 function getDistance(x1, y1, x2, y2) {
   const dx = x1 - x2;
@@ -178,16 +190,63 @@ io.on("connection", socket => {
   });
 
   socket.on("harvestResource", resourceId => {
-    const resourceIndex = resources.findIndex(r => r.id === resourceId);
-    if (resourceIndex !== -1) {
-      const resource = resources[resourceIndex];
-      // Add resource to player's inventory (not implemented here)
-      const p = players[socket.id];
+    const player = players[socket.id];
+    console.log(`[HARVEST DEBUG] Player ${player?.name} trying to harvest resource: ${resourceId}`);
+    if (!player) {
+      console.log(`[HARVEST DEBUG] Player not found for socket ${socket.id}`);
+      return;
+    }
 
-      p.inventory = p.inventory || [];
-      p.inventory.push(resource.type);
-      // For example: players[socket.id].inventory.push(resource.type);
-      resources.splice(resourceIndex, 1); // Remove harvested resource from the game
+    // Find the resource (could be environment or enemy drop)
+    const resourceIndex = resources.findIndex(r => r.id === resourceId);
+    const dropIndex = enemyDrops.findIndex(d => d.id === resourceId);
+
+    console.log(`[HARVEST DEBUG] Searching resources (total: ${resources.length}), drops (total: ${enemyDrops.length})`);
+    console.log(`[HARVEST DEBUG] Found in resources: ${resourceIndex !== -1}, Found in drops: ${dropIndex !== -1}`);
+
+        if (resourceIndex !== -1) {
+      // Harvest from environment resource
+      const resource = resources[resourceIndex];
+      console.log(`[HARVEST DEBUG] Resource found: type=${resource.type}, canHarvest=${typeof resource.canHarvest}, isDeplete=${resource.isDeplete}`);
+      
+      if (resource.canHarvest && typeof resource.canHarvest === 'function') {
+        const harvested = resource.harvestResources();
+        console.log(`[HARVEST DEBUG] Harvested result: ${JSON.stringify(harvested)}`);
+        if (harvested) {
+          // Add to player inventory
+          for (const [itemType, amount] of Object.entries(harvested)) {
+            if (itemType !== 'xpReward') {
+              player.inventory.addResource(itemType, amount);
+              console.log(`[HARVEST DEBUG] Added ${amount} ${itemType} to inventory`);
+            } else {
+              player.addXP(amount);
+              console.log(`[HARVEST DEBUG] Added ${amount} XP`);
+            }
+          }
+          console.log(`${player.name} harvested: ${JSON.stringify(harvested)}`);
+        }
+      } else {
+        console.log(`[HARVEST DEBUG] Resource missing canHarvest method or not a function`);
+      }
+    } else if (dropIndex !== -1) {
+      // Collect from enemy drop
+      const drop = enemyDrops[dropIndex];
+      console.log(`[HARVEST DEBUG] Drop found: type=${drop.type}, quantity=${drop.quantity}`);
+      const collected = drop.collect();
+      console.log(`[HARVEST DEBUG] Collected: ${collected}`);
+      if (collected > 0) {
+        player.inventory.addResource(drop.type, collected);
+        player.addXP(drop.xpReward);
+        console.log(`${player.name} collected: ${collected} ${drop.type}`);
+        
+        if (drop.isCollected) {
+          enemyDrops.splice(dropIndex, 1);
+        }
+      }
+    } else {
+      console.log(`[HARVEST DEBUG] Resource ID not found in either resources or drops`);
+      console.log(`[HARVEST DEBUG] First 3 resource IDs: ${resources.slice(0, 3).map(r => r.id).join(', ')}`);
+      console.log(`[HARVEST DEBUG] First 3 drop IDs: ${enemyDrops.slice(0, 3).map(d => d.id).join(', ')}`);
     }
   });
 
@@ -225,11 +284,13 @@ io.on("connection", socket => {
         const index = enemies.indexOf(hitEnemy);
         enemies.splice(index, 1);
 
+        // Generate resource drops from defeated enemy
+        const drops = hitEnemy.getResourceDrops();
+        enemyDrops.push(...drops);
+        console.log(`Enemy ${hitEnemy.id} defeated! Generated ${drops.length} resource drops`);
+
         // Player gains experience
-        // player.addXp(hitEnemy.xpWorth)
         player.addXP(hitEnemy.xpWorth)
-        // console.log(`ADD EXP`)
-        // console.log(player)
       }
 
       io.emit('hitEffect', { x: hitX, y: hitY, type: 'combat' })
@@ -242,19 +303,21 @@ io.on("connection", socket => {
       getDistance(hitX, hitY, res.x, res.y) < 25
     );
 
-    if (hitResource) {
+    if (hitResource && hitResource.canHarvest && typeof hitResource.canHarvest === 'function') {
       console.log(`Gathering resource: ${hitResource.type}`);
 
-      // Logic to give player items
-      if (!player.inventory) player.inventory = [];
-      // player.inventory.push(hitResource.type);
-      player.gatherResource(hitResource.type)
-
-      console.log(`Player: ${player.id} bag: ${player.inventory}`)
-
-      // Remove resource from world
-      const resIndex = resources.indexOf(hitResource);
-      resources.splice(resIndex, 1);
+      const harvested = hitResource.harvestResources();
+      if (harvested) {
+        // Add harvested items to player inventory
+        for (const [itemType, amount] of Object.entries(harvested)) {
+          if (itemType !== 'xpReward') {
+            player.inventory.addResource(itemType, amount);
+          } else {
+            player.addXP(amount);
+          }
+        }
+        console.log(`Player: ${player.id} - ${player.name} harvested: ${JSON.stringify(harvested)}`);
+      }
 
       io.emit('hitEffect', { x: hitX, y: hitY, type: 'gather' })
     }
@@ -269,7 +332,28 @@ io.on("connection", socket => {
 
 // Broadcast game state to all clients at 30 FPS
 setInterval(() => {
-  // Add AI loop here to update enemy positions and handle interactions
+  // =========================
+  // UPDATE RESOURCES (RESPAWN)
+  // =========================
+  if (resources.length > 0) {
+    // console.log(`[GAME LOOP] Updating ${resources.length} resources for respawn...`);
+  }
+  for (const resource of resources) {
+    if (resource.updateRespawn) {
+      resource.updateRespawn(1000 / 30); // ~33ms per frame at 30 FPS
+    }
+  }
+
+  // Clean up collected enemy drops
+  for (let i = enemyDrops.length - 1; i >= 0; i--) {
+    if (enemyDrops[i].shouldDespawn()) {
+      enemyDrops.splice(i, 1);
+    }
+  }
+
+  // =========================
+  // ENEMY AI & INTERACTIONS
+  // =========================
   for (const enemy of enemies) {
     let closestPlayer = null;
     let distance = Infinity;
@@ -383,7 +467,7 @@ setInterval(() => {
         if (now - enemy.lastAttackTime > 1000) { // 1 second cooldown
           closestPlayer.takeDamage(10); // Enemy damage per hita
           enemy.lastAttackTime = now;
-          console.log(`Enemy ${enemy.id} attacks player! ${(closestPlayer.name ?? closestPlayer.name) || closestPlayer.id } HP: ${closestPlayer.hp} (x:${Math.floor(enemy.x)}/y:${Math.floor(enemy.y)})`);
+          // console.log(`Enemy ${enemy.id} attacks player! ${(closestPlayer.name ?? closestPlayer.name) || closestPlayer.id } HP: ${closestPlayer.stats.hp} (x:${Math.floor(enemy.x)}/y:${Math.floor(enemy.y)})`);
         }
       }
     }
@@ -395,7 +479,27 @@ setInterval(() => {
     Object.entries(players).map(([id, p]) => [id, p.toClient()])
   );
 
-  io.emit("state", { players: statePlayers, enemies, world, resources });
+  // Serialize resources and drops for client
+  const serializedResources = resources.map(r => 
+    r.toObject ? r.toObject() : r
+  );
+  const serializedDrops = enemyDrops.map(d => d.toObject());
+
+  
+  // DEBUG: Log resource counts
+  if (resources.length > 0) {
+    // console.log(`[STATE BROADCAST] Sending ${serializedResources.length} resources to clients (sample: ${serializedResources[0]?.type})`);
+  }
+
+  
+  io.emit("state", { 
+    players: statePlayers, 
+    enemies, 
+    world, 
+    resources: serializedResources,
+    enemyDrops: serializedDrops
+  });
+
 }, 1000 / 30);
 
 const PORT = process.env.PORT || 3001;
@@ -410,15 +514,3 @@ const checkIfPlayerAlive = (person) => {
   }
   return true;
 }
-
-/**
- * 
- * Enemy w_enemy57 hit for 10!
-Enemy w_enemy57 hit for 10!
-Enemy w_enemy57 hit for 10!
-Enemy w_enemy57 attacks player! Player HP: 80
-Enemy w_enemy57 attacks player! Player HP: 70
-Enemy w_enemy57 hit for 10!
-Healed... 100
-
- */

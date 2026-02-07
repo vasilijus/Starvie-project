@@ -93,7 +93,15 @@ playBtn.addEventListener('click', () => {
     if (players[network.id]) {
       player.syncFromServer(players[network.id]);
     }
-    // store last state for continuous rendering (client-side animations)
+
+    if (players[network.id]) {
+      player.syncFromServer(players[network.id]);
+    }
+
+    // Store state in input handler for resource detection
+    input.lastGameState = data;  // ← ADD THIS LINE
+    
+    // store last state for continuous rendering
     lastState = data;
     renderer.render(data);
   });
