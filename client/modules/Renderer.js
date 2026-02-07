@@ -26,11 +26,22 @@ export default class Renderer {
             const sy = p.y - py + this.canvas.height / 2;
             ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
             
-            // Draw rotated player if facing direction is available
-            if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
-              this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection);
-            } else {
-              ctx.fillRect(sx, sy, this.player.size, this.player.size);
+            // For local player use client-side state (includes attack animation)
+                    if (id === this.player.id) {
+                        const cp = this.player;
+                        const dir = cp.facingDirection || { x: 0, y: -1 };
+                        // Debug attack state per frame for troubleshooting
+                        // (comment out when no longer needed)
+                        // eslint-disable-next-line no-console
+                        // console.log(`[Renderer] local attack: isAttacking=${cp.isAttacking} progress=${cp.attackProgress.toFixed(2)}`);
+                        this.drawRotatedPlayer(ctx, sx, sy, cp.size, dir, cp);
+                    } else {
+                // remote player: draw based on server state
+                if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
+                    this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection, null);
+                } else {
+                    ctx.fillRect(sx, sy, this.player.size, this.player.size);
+                }
             }
             
             if(p.hp < p.hpMax)
@@ -40,7 +51,7 @@ export default class Renderer {
         // Draw player direction line (from center of player square)
         const playerScreenX = this.canvas.width / 2;
         const playerScreenY = this.canvas.height / 2;
-        console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
+        // console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
         // Testing debug
         // this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
 
@@ -218,7 +229,7 @@ export default class Renderer {
     /**
      * Draw a rotated player square based on facing direction
      */
-    drawRotatedPlayer(ctx, x, y, size, direction) {
+    drawRotatedPlayer(ctx, x, y, size, direction, clientState = null) {
         const angle = Math.atan2(direction.y, direction.x);
         ctx.save();
         ctx.translate(x + size / 2, y + size / 2);
@@ -233,6 +244,31 @@ export default class Renderer {
         ctx.lineTo(size / 3, size / 3);
         ctx.closePath();
         ctx.fill();
+
+            // Hands: draw two circles on left and right (perpendicular to facing direction)
+            const handRadius = Math.max(3, Math.floor(size * 0.2));
+            const armDistance = size * 1.2;
+
+            // Left hand (fixed) placed to the player's left (negative y after rotation)
+            ctx.fillStyle = 'rgba(200,150,100,0.9)';
+            ctx.beginPath();
+            ctx.arc(0, -armDistance / 2, handRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Right hand: base position on the player's right (positive y after rotation)
+            // When attacking, push the right hand forward along the facing direction (positive x after rotation)
+            let pushForward = 0;
+            if (clientState && clientState.isAttacking) {
+                const t = Math.min(1, Math.max(0, clientState.attackProgress));
+                const ease = 1 - (1 - t) * (1 - t); // easeOutQuad
+                pushForward = ease * (armDistance * 0.6);
+            }
+
+            ctx.beginPath();
+            ctx.arc(pushForward, armDistance / 2, handRadius, 0, Math.PI * 2);
+            ctx.fill();
+
         ctx.restore();
     }
+
 }

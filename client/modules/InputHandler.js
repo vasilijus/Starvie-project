@@ -39,7 +39,7 @@ export default class InputHandler {
       this.player.facingDirection = norm;
       // Send to server so all players see the updated direction
       this.network.emit('playerFacingDirection', norm);
-      console.log(`[MouseMove] Player: (${this.player.x}, ${this.player.y}), Mouse world: (${mouseWorldX}, ${mouseWorldY}), Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
+      // console.log(`[MouseMove] Player: (${this.player.x}, ${this.player.y}), Mouse world: (${mouseWorldX}, ${mouseWorldY}), Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
     }
   }
 
@@ -99,14 +99,28 @@ export default class InputHandler {
     // Store the facing direction in player
     this.player.facingDirection = norm;
     const equipment = this.player.equipment || 'none';
-    const type = (equipment === 'sword' || equipment === 'axe') ? 'attack' : 'interact';
+    let type = (equipment === 'sword' || equipment === 'axe') ? 'attack' : 'interact';
 
-    this.network.emit('playerAction', 
-      { 
-        type, 
-        direction: norm, 
-        item: equipment 
+    // Treat left-click as an attack for immediate feedback and gameplay
+    // (click event uses button==0 for left click)
+    try {
+      if (e && typeof e.button === 'number' && e.button === 0) {
+        type = 'attack';
       }
-    );
+    } catch (err) {
+      // ignore if event doesn't have button
+    }
+
+    // If this is an attack, start local attack animation for immediate feedback
+    if (type === 'attack') {
+      try {
+        console.log('[InputHandler] attack click -> start local animation');
+        this.player.startAttack(norm);
+      } catch (err) {
+        // defensive: if player doesn't have startAttack, ignore
+      }
+    }
+
+    this.network.emit('playerAction', { type, direction: norm, item: equipment });
   }
 }
