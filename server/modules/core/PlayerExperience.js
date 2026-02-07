@@ -26,7 +26,8 @@ export class PlayerExperience {
   }
 
   calculateNextLevelThreshold() {
-    return this.xpToNextLevel * 1.5; // Exponential growth
+    // Calculate threshold based on level (exponential growth from base 100)
+    return Math.floor(100 * Math.pow(1.5, this.level));
   }
 
   getProgress() {

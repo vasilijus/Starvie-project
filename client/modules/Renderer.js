@@ -25,7 +25,14 @@ export default class Renderer {
             const sx = p.x - px + this.canvas.width / 2;
             const sy = p.y - py + this.canvas.height / 2;
             ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
-            ctx.fillRect(sx, sy, this.player.size, this.player.size);
+            
+            // Draw rotated player if facing direction is available
+            if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
+              this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection);
+            } else {
+              ctx.fillRect(sx, sy, this.player.size, this.player.size);
+            }
+            
             if(p.hp < p.hpMax)
                 this.drawHealth(ctx, sx, sy, p.hp);
         }
@@ -33,7 +40,9 @@ export default class Renderer {
         // Draw player direction line (from center of player square)
         const playerScreenX = this.canvas.width / 2;
         const playerScreenY = this.canvas.height / 2;
-        this.drawDirectionLine(ctx, playerScreenX, playerScreenY, this.player.facingDirection);
+        console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
+        // Testing debug
+        // this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
 
         // enemies
         for (const enemy of enemies) {
@@ -204,5 +213,26 @@ export default class Renderer {
         ctx.lineTo(endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
         ctx.closePath();
         ctx.fill();
+    }
+
+    /**
+     * Draw a rotated player square based on facing direction
+     */
+    drawRotatedPlayer(ctx, x, y, size, direction) {
+        const angle = Math.atan2(direction.y, direction.x);
+        ctx.save();
+        ctx.translate(x + size / 2, y + size / 2);
+        ctx.rotate(angle);
+        ctx.fillRect(-size / 2, -size / 2, size, size);
+        
+        // Draw a triangle pointing in direction
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(size / 2, 0);
+        ctx.lineTo(size / 3, -size / 3);
+        ctx.lineTo(size / 3, size / 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
     }
 }

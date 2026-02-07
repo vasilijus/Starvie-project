@@ -170,6 +170,13 @@ io.on("connection", socket => {
     p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
   });
 
+  socket.on('playerFacingDirection', (direction) => {
+    const player = players[socket.id];
+    if (player && direction && direction.x !== undefined && direction.y !== undefined) {
+      player.setFacingDirection(direction);
+    }
+  });
+
   socket.on("harvestResource", resourceId => {
     const resourceIndex = resources.findIndex(r => r.id === resourceId);
     if (resourceIndex !== -1) {
@@ -205,7 +212,8 @@ io.on("connection", socket => {
 
     if (hitEnemy) {
       // Apply damage logic
-      const baseDamage = player.damage;
+      const baseDamage = player.stats.damage;
+      console.log(player)
       const multiplier = data.weapon ? 2.5 : 1.0;
       const totalDamage = baseDamage * multiplier;
 
