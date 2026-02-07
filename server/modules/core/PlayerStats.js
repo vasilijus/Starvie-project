@@ -10,6 +10,9 @@ export class PlayerStats {
     this.speed = 5;
     this.size = 20;
     this.level = 1;
+
+    this.attackSpeed = 2; // 2 attacks per second
+    this.lastAttackTime = 0;
   }
 
   takeDamage(amount) {

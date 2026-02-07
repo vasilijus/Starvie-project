@@ -34,6 +34,9 @@ export class ClientPlayer {
     this.attackDuration = 300; // ms
     this.attackProgress = 0; // 0..1
     this.attackDirection = { x: 0, y: -1 };
+
+    this.attackSpeed = 2; // 2 attacks per second
+    this.lastAttackTime = 0;
   }
 
   /**
