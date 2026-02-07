@@ -27,20 +27,21 @@ export default class Renderer {
             ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
             
             // For local player use client-side state (includes attack animation)
-                    if (id === this.player.id) {
-                        const cp = this.player;
-                        const dir = cp.facingDirection || { x: 0, y: -1 };
-                        // Debug attack state per frame for troubleshooting
-                        // (comment out when no longer needed)
-                        // eslint-disable-next-line no-console
-                        // console.log(`[Renderer] local attack: isAttacking=${cp.isAttacking} progress=${cp.attackProgress.toFixed(2)}`);
-                        this.drawRotatedPlayer(ctx, sx, sy, cp.size, dir, cp);
-                    } else {
+            if (id === this.player.id) {
+                const cp = this.player;
+                const dir = cp.facingDirection || { x: 0, y: -1 };
+                // Debug attack state per frame for troubleshooting
+                // (comment out when no longer needed)
+                // eslint-disable-next-line no-console
+                // console.log(`[Renderer] local attack: isAttacking=${cp.isAttacking} progress=${cp.attackProgress.toFixed(2)}`);
+                this.drawRotatedPlayer(ctx, sx, sy, cp.size, dir, cp);
+            } else {
                 // remote player: draw based on server state
                 if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
                     this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection, null);
                 } else {
-                    ctx.fillRect(sx, sy, this.player.size, this.player.size);
+                    // ctx.fillRect(sx, sy, this.player.size, this.player.size);
+                    ctx.roundRect(10, 150, 150, 100, [10, 10]);
                 }
             }
             
@@ -79,8 +80,10 @@ export default class Renderer {
                 resource: r,
                 baseX: r.x - this.player.x + this.canvas.width / 2,
                 baseY: r.y - this.player.y + this.canvas.height / 2,
+                //  baseY: r.y - this.player.y + this.canvas.height / 2
                 offsetX: 0,
                 offsetY: 0
+                
             }));
 
         // Second pass: Apply offsets to overlapping resources (iterative)
@@ -111,6 +114,12 @@ export default class Renderer {
                 }
             }
         }
+        // Rm 88 - 115 / 123 - 126
+        // // Draw all resources at their world positions (no client-side separation)
+        // // Server-side spatial checking prevents overlap at spawn time
+        // for (const { resource: r, baseX, baseY } of resourceScreenPositions) {
+        //     const sx = baseX;
+        //     const sy = baseY;
 
         // Third pass: Draw all resources with offsets
         for (const { resource: r, baseX, baseY, offsetX, offsetY } of resourceScreenPositions) {
@@ -226,17 +235,48 @@ export default class Renderer {
         ctx.fill();
     }
 
+
     /**
-     * Draw a rotated player square based on facing direction
+     * Draws a rotated player with rounded corners and animated hands.
      */
     drawRotatedPlayer(ctx, x, y, size, direction, clientState = null) {
-        const angle = Math.atan2(direction.y, direction.x);
-        ctx.save();
-        ctx.translate(x + size / 2, y + size / 2);
-        ctx.rotate(angle);
-        ctx.fillRect(-size / 2, -size / 2, size, size);
+    const angle = Math.atan2(direction.y, direction.x);
+    const center = { x: x + size / 2, y: y + size / 2 };
+    const radius = size * 0.2; // Corner roundness
+
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.rotate(angle);
+
+    this._drawPlayerBody(ctx, size, radius);
+    this._drawDirectionIndicator(ctx, size);
+    this._drawHands(ctx, size, clientState);
+
+    ctx.restore();
+    }
+
+    /**
+     * Draws the main player body as a rounded square.
+     */
+    _drawPlayerBody(ctx, size, radius) {
+        const half = size / 2;
         
-        // Draw a triangle pointing in direction
+        ctx.beginPath();
+        // Using roundRect is the modern standard for rounded corners
+        // Supported in all major browsers (Chrome 99+, Firefox 102+, Safari 15.4+)
+        if (ctx.roundRect) {
+            ctx.roundRect(-half, -half, size, size, radius);
+        } else {
+            // Fallback for older environments
+            this._manualRoundRect(ctx, -half, -half, size, size, radius);
+        }
+        ctx.fill();
+    }
+
+    /**
+     * Draws a small triangle pointing in the direction the player is facing.
+     */
+    _drawDirectionIndicator(ctx, size) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.beginPath();
         ctx.moveTo(size / 2, 0);
@@ -244,31 +284,46 @@ export default class Renderer {
         ctx.lineTo(size / 3, size / 3);
         ctx.closePath();
         ctx.fill();
+    }
 
-            // Hands: draw two circles on left and right (perpendicular to facing direction)
-            const handRadius = Math.max(3, Math.floor(size * 0.2));
-            const armDistance = size * 1.2;
+    /**
+     * Handles the logic for positioning and drawing hands.
+     */
+    _drawHands(ctx, size, clientState) {
+        const handRadius = Math.max(3, Math.floor(size * 0.2));
+        const armDistance = size * 1.2;
+        const halfArm = armDistance / 2;
 
-            // Left hand (fixed) placed to the player's left (negative y after rotation)
-            ctx.fillStyle = 'rgba(200,150,100,0.9)';
-            ctx.beginPath();
-            ctx.arc(0, -armDistance / 2, handRadius, 0, Math.PI * 2);
-            ctx.fill();
+        ctx.fillStyle = 'rgba(200,150,100,0.9)';
 
-            // Right hand: base position on the player's right (positive y after rotation)
-            // When attacking, push the right hand forward along the facing direction (positive x after rotation)
-            let pushForward = 0;
-            if (clientState && clientState.isAttacking) {
-                const t = Math.min(1, Math.max(0, clientState.attackProgress));
-                const ease = 1 - (1 - t) * (1 - t); // easeOutQuad
-                pushForward = ease * (armDistance * 0.6);
-            }
+        // Left hand (Fixed)
+        ctx.beginPath();
+        ctx.arc(0, -halfArm, handRadius, 0, Math.PI * 2);
+        ctx.fill();
 
-            ctx.beginPath();
-            ctx.arc(pushForward, armDistance / 2, handRadius, 0, Math.PI * 2);
-            ctx.fill();
+        // Right hand (Animated for attacking)
+        let pushForward = 0;
+        if (clientState?.isAttacking) {
+            const t = Math.min(1, Math.max(0, clientState.attackProgress));
+            const easeOutQuad = 1 - (1 - t) * (1 - t);
+            pushForward = easeOutQuad * (armDistance * 0.6);
+        }
 
-        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(pushForward, halfArm, handRadius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    /**
+     * Fallback for environments where ctx.roundRect is not available.
+     */
+    _manualRoundRect(ctx, x, y, width, height, radius) {
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + width, y, x + width, y + height, radius);
+        ctx.arcTo(x + width, y + height, x, y + height, radius);
+        ctx.arcTo(x, y + height, x, y, radius);
+        ctx.arcTo(x, y, x + width, y, radius);
+        ctx.closePath();
     }
 
 }
