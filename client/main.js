@@ -1,4 +1,4 @@
-import { Player } from "./modules/Player.js";
+import { ClientPlayer } from "./modules/ClientPlayer.js";
 import { WorldRenderer } from "./modules/WorldRenderer.js";
 import Network from "./modules/Network.js";
 import InputHandler from "./modules/InputHandler.js";
@@ -43,9 +43,9 @@ playBtn.addEventListener('click', () => {
   landing.classList.add('hidden');
 
   // Initialize player with entered name
-  const player = new Player(playerID, playerName);
+  const player = new ClientPlayer(playerID, playerName);
 
-  player.activeEffects = []; // Initialize once here!
+  player.activeEffects = []; // Initialize effects array
 
   network.on('hitEffect', (effectData) => {
       // REMOVE THIS LINE: player.activeEffects = [] 
@@ -90,8 +90,7 @@ playBtn.addEventListener('click', () => {
       mapEditor.setWorld(data.world);
     }
     if (players[network.id]) {
-      player.x = players[network.id].x;
-      player.y = players[network.id].y;
+      player.syncFromServer(players[network.id]);
     }
     renderer.render(data);
   });

@@ -1,9 +1,10 @@
+import { BIOME_RULES } from './BiomeRules.js';
 
 export const CHUNK_SIZE = 10;
 export const TILE_SIZE = 32;
 export const WORLD_CHUNKS = 10;
 
-const biomes = ["forest", "plains", "desert"];
+const biomes = ["forest", "plains", "desert", "snow", "swamp"];
 
 function getProceduralBiome(cx, cy, seed) {
   // Later we can swap this with Perlin noise
@@ -69,14 +70,107 @@ export function generateWorld(seed = 1) {
 function generateChunk(cx, cy, seed) {
   const biome = getProceduralBiome(cx, cy, seed);
   const tiles = [];
+  const resources = [];
 
+  // Get biome rules for this biome
+  const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
+
+  // Generate tiles
   for (let y = 0; y < CHUNK_SIZE; y++) {
     for (let x = 0; x < CHUNK_SIZE; x++) {
       tiles.push(biome);
     }
   }
 
-  return { biome, tiles };
+  // Track occupied tile positions to prevent overlaps
+  const occupiedTiles = new Set();
+
+  // Helper function to find a free nearby tile position
+  function findFreeTilePosition(preferredX, preferredY, maxSearchRadius = 3) {
+    // Check if preferred position is free
+    const key = `${preferredX},${preferredY}`;
+    if (!occupiedTiles.has(key)) {
+      return { x: preferredX, y: preferredY };
+    }
+
+    // Spiral outward to find a free tile
+    for (let radius = 1; radius <= maxSearchRadius; radius++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          // Only check positions on the current radius boundary
+          if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+
+          const checkX = preferredX + dx;
+          const checkY = preferredY + dy;
+
+          // Check bounds
+          if (checkX < 0 || checkX >= CHUNK_SIZE || checkY < 0 || checkY >= CHUNK_SIZE) {
+            continue;
+          }
+
+          const checkKey = `${checkX},${checkY}`;
+          if (!occupiedTiles.has(checkKey)) {
+            return { x: checkX, y: checkY };
+          }
+        }
+      }
+    }
+
+    // If no free position found within search radius, return original with offset anyway
+    return { x: preferredX, y: preferredY };
+  }
+
+  // Generate resources based on biome rules
+  if (biomeRule.resources) {
+    const chunkSeed = cx * 73856093 ^ cy * 19349663 ^ seed; // Generate consistent seed per chunk
+    
+    for (const resourceRule of biomeRule.resources) {
+      const { type, density, icon_color } = resourceRule;
+      const expectedCount = Math.round((CHUNK_SIZE * CHUNK_SIZE) * density);
+
+      for (let i = 0; i < expectedCount; i++) {
+        // Use deterministic pseudo-random placement
+        const pseudoRand = Math.sin(chunkSeed + i * 12.9898) * 43758.5453;
+        const randomVal = pseudoRand - Math.floor(pseudoRand);
+
+        // If random check passes, place resource
+        if (randomVal < density) {
+          // Generate random X and Y within chunk bounds (0 to CHUNK_SIZE-1)
+          const randXfrac = (Math.sin(chunkSeed + i * 78.233) * 43758.5453) % 1;
+          const randYfrac = (Math.sin(chunkSeed + i * 45.164) * 43758.5453) % 1;
+          const randX = Math.floor(Math.abs(randXfrac) * CHUNK_SIZE);
+          const randY = Math.floor(Math.abs(randYfrac) * CHUNK_SIZE);
+
+          // Clamp to valid tile positions
+          let tileX = Math.min(randX, CHUNK_SIZE - 1);
+          let tileY = Math.min(randY, CHUNK_SIZE - 1);
+
+          // Find a free position if this one is occupied
+          const freePos = findFreeTilePosition(tileX, tileY);
+          tileX = freePos.x;
+          tileY = freePos.y;
+
+          // Mark this tile as occupied
+          occupiedTiles.add(`${tileX},${tileY}`);
+
+          // Convert tile position to world position
+          const worldX = cx * CHUNK_SIZE * TILE_SIZE + tileX * TILE_SIZE + TILE_SIZE / 2;
+          const worldY = cy * CHUNK_SIZE * TILE_SIZE + tileY * TILE_SIZE + TILE_SIZE / 2;
+
+          resources.push({
+            type,
+            x: worldX,
+            y: worldY,
+            icon_color, // Include icon_color from biome rules
+            hp: 100,
+            hpMax: 100
+          });
+        }
+      }
+    }
+  }
+
+  return { biome, tiles, resources };
 }
 
 export function getChunk(cx, cy, seed = 1) {
@@ -85,10 +179,13 @@ export function getChunk(cx, cy, seed = 1) {
   // 1) Handmade chunk exists → use it
   if (handmadeChunks && handmadeChunks[key]) {
     const biome = handmadeChunks[key].biome;
+    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
+    
+    // Add resources from biome rules for handmade chunks too
+    const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
+    const resources = handmadeChunks[key].resources || [];
 
-    // rebuild tiles from biome
-    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome); // 8 = 8 * 8 = 64
-    return { biome, tiles };
+    return { biome, tiles, resources };
   }
 
   // 2) Otherwise → procedural chunk

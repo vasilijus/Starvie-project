@@ -3,7 +3,7 @@ export default class StatusPanel {
     this.x = opts.x ?? 10;
     this.y = opts.y ?? 10;
     this.w = opts.width ?? 200;
-    this.h = opts.height ?? 56;
+    this.h = opts.height ?? 130; // Increased height for inventory
     this.bg = opts.bgColor ?? 'rgba(0,0,0,0.6)';
     this.barBg = opts.barBg ?? '#444';
     this.barFg = opts.barColor ?? '#4caf50';
@@ -12,9 +12,10 @@ export default class StatusPanel {
   }
 
   draw(ctx, player) {
-    const lvl = (player.level != null) ? player.level : (player.getLevel ? player.getLevel() : 1);
-    const xp = (player.xp != null) ? player.xp : (player.getXP ? player.getXP() : 0);
-    const next = (player.nextLevelXp != null) ? player.nextLevelXp : (player.getNextLevelXp ? player.getNextLevelXp() : 100);
+    const lvl = player.level || 1;
+    const xp = player.xp || 0;
+    const next = player.xpToNextLevel || 100;
+    const inventory = player.inventory || {};
 
     // background box
     ctx.save();
@@ -22,7 +23,7 @@ export default class StatusPanel {
     ctx.fillStyle = this.bg;
     roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
 
-    // text
+    // Level text
     ctx.fillStyle = '#fff';
     ctx.font = this.font;
     ctx.textBaseline = 'top';
@@ -30,7 +31,7 @@ export default class StatusPanel {
 
     // XP bar
     const barX = this.x + this.padding;
-    const barY = this.y + this.h - this.padding - 10;
+    const barY = this.y + this.h - 85;
     const barW = this.w - this.padding * 2;
     const barH = 12;
     ctx.fillStyle = this.barBg;
@@ -42,7 +43,32 @@ export default class StatusPanel {
     // xp text
     ctx.fillStyle = '#fff';
     ctx.font = '12px sans-serif';
-    ctx.fillText(`${xp} / ${next}`, barX + 6, barY - 12);
+    ctx.fillText(`XP: ${xp} / ${next}`, barX + 6, barY - 12);
+
+    // Inventory header
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('Resources:', this.x + this.padding, barY + 20);
+
+    // Draw inventory items
+    let inventoryY = barY + 35;
+    const maxItems = 3; // Show max 3 items
+    let itemCount = 0;
+    
+    for (const [resourceType, amount] of Object.entries(inventory)) {
+      if (itemCount >= maxItems) break;
+      ctx.fillStyle = '#aef';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(`${resourceType}: ${amount}`, this.x + this.padding + 10, inventoryY);
+      inventoryY += 15;
+      itemCount++;
+    }
+
+    if (itemCount === 0) {
+      ctx.fillStyle = '#888';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('(empty)', this.x + this.padding + 10, inventoryY);
+    }
 
     ctx.restore();
   }

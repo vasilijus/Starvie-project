@@ -13,15 +13,26 @@ export default class Renderer {
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.worldRenderer.draw(ctx, state.world, this.player);
 
+        // Use player position directly
+        const px = this.player?.x || 0;
+        const py = this.player?.y || 0;
+
         // players
         for (const id in players) {
             const p = players[id];
             //   console.log(`Player: ${p.id}`)
             // console.log(`Players`, players)
-            const sx = p.x - this.player.x + this.canvas.width / 2;
-            const sy = p.y - this.player.y + this.canvas.height / 2;
+            const sx = p.x - px + this.canvas.width / 2;
+            const sy = p.y - py + this.canvas.height / 2;
             ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
-            ctx.fillRect(sx, sy, this.player.size, this.player.size);
+            
+            // Draw rotated player if facing direction is available
+            if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
+              this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection);
+            } else {
+              ctx.fillRect(sx, sy, this.player.size, this.player.size);
+            }
+            
             if(p.hp < p.hpMax)
                 this.drawHealth(ctx, sx, sy, p.hp);
         }
@@ -29,12 +40,14 @@ export default class Renderer {
         // Draw player direction line (from center of player square)
         const playerScreenX = this.canvas.width / 2;
         const playerScreenY = this.canvas.height / 2;
-        this.drawDirectionLine(ctx, playerScreenX, playerScreenY, this.player.facingDirection);
+        console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
+        // Testing debug
+        // this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
 
         // enemies
         for (const enemy of enemies) {
-            const sx = enemy.x - this.player.x + this.canvas.width / 2;
-            const sy = enemy.y - this.player.y + this.canvas.height / 2;
+            const sx = enemy.x - px + this.canvas.width / 2;
+            const sy = enemy.y - py + this.canvas.height / 2;
             // ctx.fillStyle = 'grey';
             ctx.fillStyle = enemy.color;
             ctx.fillRect(sx, sy, enemy.size, enemy.size );
@@ -43,12 +56,76 @@ export default class Renderer {
         }
         
 
-        // resources
-        for (const r of resources) {
-            const sx = r.x - this.player.x + this.canvas.width / 2;
-            const sy = r.y - this.player.y + this.canvas.height / 2;
-            ctx.fillStyle = r.icon_color || 'green';
-            ctx.fillRect(sx, sy, 10, 10);
+        // First pass: Calculate screen positions for all resources
+        const resourceScreenPositions = resources
+            .filter(r => {
+                const sx = r.x - px + this.canvas.width / 2;
+                const sy = r.y - py + this.canvas.height / 2;
+                // Check if on-screen
+                return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
+            })
+            .map(r => ({
+                resource: r,
+                baseX: r.x - this.player.x + this.canvas.width / 2,
+                baseY: r.y - this.player.y + this.canvas.height / 2,
+                offsetX: 0,
+                offsetY: 0
+            }));
+
+        // Second pass: Apply offsets to overlapping resources (iterative)
+        const MIN_DISTANCE = 35; // Minimum pixel distance between resources
+        const SEPARATION_ITERATIONS = 5; // Multiple passes for better separation
+        
+        for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
+            for (let i = 0; i < resourceScreenPositions.length; i++) {
+                for (let j = i + 1; j < resourceScreenPositions.length; j++) {
+                    const r1 = resourceScreenPositions[i];
+                    const r2 = resourceScreenPositions[j];
+                    
+                    // Calculate distance between resources (including offsets)
+                    const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
+                    const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // If too close, push them apart more aggressively
+                    if (distance < MIN_DISTANCE && distance > 0.1) {
+                        const angle = Math.atan2(dy, dx);
+                        const pushDistance = (MIN_DISTANCE - distance) / 2 + 2; // Extra push for better separation
+                        
+                        r1.offsetX -= Math.cos(angle) * pushDistance;
+                        r1.offsetY -= Math.sin(angle) * pushDistance;
+                        r2.offsetX += Math.cos(angle) * pushDistance;
+                        r2.offsetY += Math.sin(angle) * pushDistance;
+                    }
+                }
+            }
+        }
+
+        // Third pass: Draw all resources with offsets
+        for (const { resource: r, baseX, baseY, offsetX, offsetY } of resourceScreenPositions) {
+            const sx = baseX + offsetX;
+            const sy = baseY + offsetY;
+
+            // Draw resource with icon color
+            const color = r.icon_color || '#00AA00';
+            ctx.fillStyle = color;
+            ctx.fillRect(sx - 5, sy - 5, 10, 10);
+            
+            // Draw resource type label (small text above resource)
+            ctx.fillStyle = color;
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(r.type || 'resource', sx, sy - 12);
+            
+            // Draw HP indicator if damaged
+            if (r.hp !== undefined && r.hpMax !== undefined && r.hp < r.hpMax) {
+                const hpPercent = r.hp / r.hpMax;
+                ctx.fillStyle = hpPercent > 0.5 ? '#00AA00' : hpPercent > 0.25 ? '#FFAA00' : '#AA0000';
+                ctx.fillRect(sx - 4, sy - 10, 8 * hpPercent, 2);
+                ctx.strokeStyle = '#333333';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(sx - 4, sy - 10, 8, 2);
+            }
         }
 
         // Draw Effects
@@ -136,5 +213,26 @@ export default class Renderer {
         ctx.lineTo(endX - arrowSize * Math.cos(angle + Math.PI / 6), endY - arrowSize * Math.sin(angle + Math.PI / 6));
         ctx.closePath();
         ctx.fill();
+    }
+
+    /**
+     * Draw a rotated player square based on facing direction
+     */
+    drawRotatedPlayer(ctx, x, y, size, direction) {
+        const angle = Math.atan2(direction.y, direction.x);
+        ctx.save();
+        ctx.translate(x + size / 2, y + size / 2);
+        ctx.rotate(angle);
+        ctx.fillRect(-size / 2, -size / 2, size, size);
+        
+        // Draw a triangle pointing in direction
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.moveTo(size / 2, 0);
+        ctx.lineTo(size / 3, -size / 3);
+        ctx.lineTo(size / 3, size / 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
     }
 }
