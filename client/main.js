@@ -3,6 +3,7 @@ import { WorldRenderer } from "./modules/WorldRenderer.js";
 import Network from "./modules/Network.js";
 import InputHandler from "./modules/InputHandler.js";
 import Renderer from "./modules/Renderer.js";
+import { MapEditor } from "./modules/MapEditor.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -65,17 +66,29 @@ playBtn.addEventListener('click', () => {
 
   // Initialize game components
   const worldRenderer = new WorldRenderer();
+  const mapEditor = new MapEditor(canvas, ctx, player, worldRenderer, network);
 
-  const renderer = new Renderer(canvas, ctx, player, worldRenderer);
+  const renderer = new Renderer(canvas, ctx, player, worldRenderer, mapEditor);
 
-  const input = new InputHandler(canvas, player, network);
+  const input = new InputHandler(canvas, player, network, mapEditor);
 
   console.log("Renderer initialized with player:", player);
   console.log("InputHandler initialized with canvas", canvas);
+  
+  // Initialize world in editor (will be set once on first state update)
+  let worldInitialized = false;
     
   // Receive authoritative state and hand to renderer
   network.on('state', data => {
     const { players, enemies, worldSize, resources } = data;
+    // Initialize world once, then only update if NOT in editor mode
+    if (!worldInitialized) {
+      mapEditor.setWorld(data.world);
+      worldInitialized = true;
+    } else if (!mapEditor.isActive) {
+      // Only overwrite world data if not actively editing
+      mapEditor.setWorld(data.world);
+    }
     if (players[network.id]) {
       player.x = players[network.id].x;
       player.y = players[network.id].y;

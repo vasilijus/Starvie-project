@@ -1,5 +1,5 @@
 
-export const CHUNK_SIZE = 16;
+export const CHUNK_SIZE = 10;
 export const TILE_SIZE = 32;
 export const WORLD_CHUNKS = 10;
 
@@ -42,13 +42,27 @@ export function setHandmadeMap(jsonChunks) {
 // }
 
 export function generateWorld(seed = 1) {
+  // If handmade chunks were set, use them
+  if (handmadeChunks) {
+    const chunks = {};
+    for (const key in handmadeChunks) {
+      chunks[key] = handmadeChunks[key];
+    }
+      // console.log(JSON.stringify(chunks))
+// console.log(chunks['9,9'])
+    return { chunks };
+  }
+
+  // Otherwise generate procedurally
   const chunks = {};
   for ( let cx = 0; cx < WORLD_CHUNKS; cx++ ) {
     for ( let cy = 0; cy < WORLD_CHUNKS; cy++ ) {
-      chunks[`${cx},${cy}`] = getChunk(cx, cy, seed);
+      chunks[`${cx},${cy}`] = getChunk(cx, cy, seed); 
+
     }
   }
-
+  // console.log(JSON.stringify(chunks))
+  // console.log(chunks['0,0'])
   return { chunks };
 }
 
@@ -73,7 +87,7 @@ export function getChunk(cx, cy, seed = 1) {
     const biome = handmadeChunks[key].biome;
 
     // rebuild tiles from biome
-    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
+    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome); // 8 = 8 * 8 = 64
     return { biome, tiles };
   }
 

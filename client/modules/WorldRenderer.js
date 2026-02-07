@@ -1,6 +1,8 @@
-const TILE_SIZE = 32;
-const CHUNK_SIZE = 16;
-const WORLD_CHUNKS = 10;
+
+export const CHUNK_SIZE = 10;
+export const TILE_SIZE = 32;
+export const WORLD_CHUNKS = 10;
+
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size
 
 const TILE_COLORS = {
