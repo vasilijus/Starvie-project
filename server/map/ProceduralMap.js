@@ -128,43 +128,36 @@ function generateChunk(cx, cy, seed) {
       const { type, density, icon_color } = resourceRule;
       const expectedCount = Math.round((CHUNK_SIZE * CHUNK_SIZE) * density);
 
-      for (let i = 0; i < expectedCount; i++) {
-        // Use deterministic pseudo-random placement
-        const pseudoRand = Math.sin(chunkSeed + i * 12.9898) * 43758.5453;
-        const randomVal = pseudoRand - Math.floor(pseudoRand);
+      // Iterate through each tile in the chunk
+      for (let tileY = 0; tileY < CHUNK_SIZE; tileY++) {
+        for (let tileX = 0; tileX < CHUNK_SIZE; tileX++) {
+          // Generate a deterministic but pseudo-random value for this specific tile
+          const tileHash = chunkSeed + tileX * 73856093 + tileY * 19349663 + type.charCodeAt(0) * 27644437;
+          const pseudoRand = Math.sin(tileHash) * 43758.5453;
+          const randomVal = pseudoRand - Math.floor(pseudoRand);
 
-        // If random check passes, place resource
-        if (randomVal < density) {
-          // Generate random X and Y within chunk bounds (0 to CHUNK_SIZE-1)
-          const randXfrac = (Math.sin(chunkSeed + i * 78.233) * 43758.5453) % 1;
-          const randYfrac = (Math.sin(chunkSeed + i * 45.164) * 43758.5453) % 1;
-          const randX = Math.floor(Math.abs(randXfrac) * CHUNK_SIZE);
-          const randY = Math.floor(Math.abs(randYfrac) * CHUNK_SIZE);
+          // Place resource if random roll succeeds (based on density)
+          if (randomVal < density) {
+            const key = `${tileX},${tileY}`;
+            
+            // Only place if tile is free
+            if (!occupiedTiles.has(key)) {
+              occupiedTiles.add(key);
 
-          // Clamp to valid tile positions
-          let tileX = Math.min(randX, CHUNK_SIZE - 1);
-          let tileY = Math.min(randY, CHUNK_SIZE - 1);
+              // Convert tile position to world position
+              const worldX = cx * CHUNK_SIZE * TILE_SIZE + tileX * TILE_SIZE + TILE_SIZE / 2;
+              const worldY = cy * CHUNK_SIZE * TILE_SIZE + tileY * TILE_SIZE + TILE_SIZE / 2;
 
-          // Find a free position if this one is occupied
-          const freePos = findFreeTilePosition(tileX, tileY);
-          tileX = freePos.x;
-          tileY = freePos.y;
-
-          // Mark this tile as occupied
-          occupiedTiles.add(`${tileX},${tileY}`);
-
-          // Convert tile position to world position
-          const worldX = cx * CHUNK_SIZE * TILE_SIZE + tileX * TILE_SIZE + TILE_SIZE / 2;
-          const worldY = cy * CHUNK_SIZE * TILE_SIZE + tileY * TILE_SIZE + TILE_SIZE / 2;
-
-          resources.push({
-            type,
-            x: worldX,
-            y: worldY,
-            icon_color, // Include icon_color from biome rules
-            hp: 100,
-            hpMax: 100
-          });
+              resources.push({
+                type,
+                x: worldX,
+                y: worldY,
+                icon_color, // Include icon_color from biome rules
+                hp: 100,
+                hpMax: 100
+              });
+            }
+          }
         }
       }
     }

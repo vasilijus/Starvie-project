@@ -9,6 +9,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+let lastState = undefined;
 
 
 
@@ -92,12 +93,18 @@ playBtn.addEventListener('click', () => {
     if (players[network.id]) {
       player.syncFromServer(players[network.id]);
     }
+    // store last state for continuous rendering (client-side animations)
+    lastState = data;
     renderer.render(data);
   });
 
   // Game loop
   function loop() {
     player.update();
+    // Re-render using last known server state so client-side visuals animate smoothly
+    if (typeof lastState !== 'undefined') {
+      renderer.render(lastState);
+    }
     requestAnimationFrame(loop);
   }
   gameStarted = true;

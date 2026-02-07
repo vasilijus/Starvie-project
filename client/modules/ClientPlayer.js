@@ -27,6 +27,16 @@ export class ClientPlayer {
     this.isAlive = true;
     this.facingDirection = { x: 0, y: -1 };
     this.activeEffects = [];
+
+    // Attack / action visual state (client-side)
+    this.isAttacking = false;
+    this.attackStart = 0;
+    this.attackDuration = 300; // ms
+    this.attackProgress = 0; // 0..1
+    this.attackDirection = { x: 0, y: -1 };
+
+    this.attackSpeed = 2; // 2 attacks per second
+    this.lastAttackTime = 0;
   }
 
   /**
@@ -52,7 +62,30 @@ export class ClientPlayer {
    * Update (no-op now that we use direct x/y)
    */
   update() {
-    // Smooth interpolation removed - using direct x/y from server
+    // Update attack animation progress
+    if (this.isAttacking) {
+      const now = Date.now();
+      const t = (now - this.attackStart) / Math.max(1, this.attackDuration);
+      if (t >= 1) {
+        this.isAttacking = false;
+        this.attackProgress = 0;
+      } else {
+        this.attackProgress = t;
+      }
+    }
+  }
+
+  /**
+   * Start a local attack animation (visual only)
+   * direction: {x,y}
+   */
+  startAttack(direction, duration = 300) {
+    this.isAttacking = true;
+    this.attackStart = Date.now();
+    this.attackDuration = duration;
+    this.attackProgress = 0;
+    this.attackDirection = direction || { x: 0, y: -1 };
+    console.log(`[ClientPlayer] startAttack: dir=(${this.attackDirection.x.toFixed(2)}, ${this.attackDirection.y.toFixed(2)}), duration=${this.attackDuration}`);
   }
 
   /**

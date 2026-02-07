@@ -39,7 +39,7 @@ export default class InputHandler {
       this.player.facingDirection = norm;
       // Send to server so all players see the updated direction
       this.network.emit('playerFacingDirection', norm);
-      console.log(`[MouseMove] Player: (${this.player.x}, ${this.player.y}), Mouse world: (${mouseWorldX}, ${mouseWorldY}), Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
+      // console.log(`[MouseMove] Player: (${this.player.x}, ${this.player.y}), Mouse world: (${mouseWorldX}, ${mouseWorldY}), Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
     }
   }
 
@@ -77,36 +77,58 @@ export default class InputHandler {
 
   handleClick(e) {
     console.log('mouseevent')
-    // In editor mode, paint chunks
+    // 1. Keep Editor mode unthrottled for better UX
     if (this.mapEditor && this.mapEditor.isActive) {
-      const { worldX, worldY } = this.mapEditor.screenToWorld(e.clientX, e.clientY, this.player);
-      this.mapEditor.paintChunk(worldX, worldY);
-      return;
+        const { worldX, worldY } = this.mapEditor.screenToWorld(e.clientX, e.clientY, this.player);
+        this.mapEditor.paintChunk(worldX, worldY);
+        return;
     }
 
-    // Normal gameplay click
+    // 2. Determine if this is an attack
+    // Treat left-click as an attack for immediate feedback and gameplay
+    // (click event uses button==0 for left click)
+    const isLeftClick = e && typeof e.button === 'number' && e.button === 0;
+    const equipment = this.player.equipment || 'none';
+    const isMeleeEquipped = (equipment === 'sword' || equipment === 'axe');
+    const type = (isMeleeEquipped || isLeftClick) ? 'attack' : 'interact';
+
+    // 3. Apply Throttle Logic
+    if (type === 'attack') {
+        const now = Date.now();
+        // Calculate delay in ms (e.g., 2 speed = 500ms delay)
+        const attackDelay = 2000 / this.player.attackSpeed; 
+
+        if (now - this.player.lastAttackTime < attackDelay) {
+            console.log('Attack on cooldown...');
+            return; // Exit function; click is ignored
+        }
+
+        // Update the timestamp only on a successful attack
+        this.player.lastAttackTime = now;
+    }
+
+    // 4. Existing Logic (Positioning & Emitting)
     const clickX = this.player.x - this.canvas.width / 2 + e.clientX;
     const clickY = this.player.y - this.canvas.height / 2 + e.clientY;
-
     const dx = clickX - this.player.x;
     const dy = clickY - this.player.y;
-
     const len = Math.hypot(dx, dy);
     if (len === 0) return;
 
     const norm = { x: dx / len, y: dy / len };
-
-    // Store the facing direction in player
     this.player.facingDirection = norm;
-    const equipment = this.player.equipment || 'none';
-    const type = (equipment === 'sword' || equipment === 'axe') ? 'attack' : 'interact';
 
-    this.network.emit('playerAction', 
-      { 
-        type, 
-        direction: norm, 
-        item: equipment 
+    // If this is an attack, start local attack animation for immediate feedback
+    if (type === 'attack') {
+      try { 
+        // console.log('[InputHandler] attack click -> start local animation');
+        this.player.startAttack(norm);
+      } catch(err) {
+        // defensive: if player doesn't have startAttack, ignore
       }
-    );
+    }
+
+    this.network.emit('playerAction', { type, direction: norm, item: equipment });
+
   }
 }

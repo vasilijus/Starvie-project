@@ -19,7 +19,7 @@ export const BIOME_RULES = {
       { type: "tree", density: 0.04, icon_color: "#2F5233" },           // 4% - scattered trees
       { type: "berry", density: 0.03, icon_color: "#FF6B9D" },          // 3% - berries
       { type: "rock", density: 0.03, icon_color: "#808080" },           // 3% - stone
-      { type: "herb", density: 0.03, icon_color: "#90EE90" }            // 3% - herbs
+      { type: "herb", density: 0.02, icon_color: "#90EE90" }            // 3% - herbs
     ]
   },
 
@@ -39,7 +39,7 @@ export const BIOME_RULES = {
     groundTile: "snow",
     description: "Frozen tundra with minimal but valuable resources",
     resources: [
-      { type: "rock", density: 0.06, icon_color: "#B0C4DE" },           // 6% - abundant stone
+      { type: "rock", density: 0.03, icon_color: "#B0C4DE" },           // 6% - abundant stone
       { type: "ice", density: 0.05, icon_color: "#E0FFFF" },            // 5% - water source
       { type: "ore", density: 0.04, icon_color: "#696969" },            // 4% - rare ore
       { type: "crystal", density: 0.02, icon_color: "#B0E0E6" },        // 2% - rare
@@ -51,9 +51,9 @@ export const BIOME_RULES = {
     groundTile: "grass",
     description: "Murky wetlands with unique vegetation and dark resources",
     resources: [
-      { type: "mushroom", density: 0.10, icon_color: "#8B4513" },       // 10% - most abundant here
-      { type: "herb", density: 0.07, icon_color: "#90EE90" },           // 7% - medicinal herbs
-      { type: "tree", density: 0.05, icon_color: "#2F5233" },           // 5% - darker wood
+      { type: "mushroom", density: 0.05, icon_color: "#8B4513" },       // 10% - most abundant here
+      { type: "herb", density: 0.01, icon_color: "#90EE90" },           // 7% - medicinal herbs
+      { type: "tree", density: 0.06, icon_color: "#2F5233" },           // 5% - darker wood
       { type: "berry", density: 0.04, icon_color: "#FF6B9D" },          // 4% - rare berries
       { type: "ore", density: 0.02, icon_color: "#696969" }             // 2% - bog ore
     ]
