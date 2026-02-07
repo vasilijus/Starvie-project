@@ -8,7 +8,8 @@ export default class Renderer {
     }
 
     render(state) {
-        const { players, enemies = [], resources = [] } = state;
+        // const { players, enemies = [], resources = [] } = state;
+        const { players, enemies = [], resources = [], enemyDrops = [] } = state;
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.worldRenderer.draw(ctx, state.world, this.player);
@@ -148,6 +149,8 @@ export default class Renderer {
             }
         }
 
+        
+
         // Draw Effects
         this.player.activeEffects.forEach((effect, index) => {
             // 1. Calculate Screen Position
@@ -190,6 +193,43 @@ export default class Renderer {
           this.mapEditor.drawGrid(ctx, this.player);
         }
 
+        // Draw enemy drops (temporary loot)
+        const dropScreenPositions = enemyDrops
+            .filter(d => {
+                const sx = d.x - px + this.canvas.width / 2;
+                const sy = d.y - py + this.canvas.height / 2;
+                return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
+            })
+            .map(d => ({
+                drop: d,
+                baseX: d.x - this.player.x + this.canvas.width / 2,
+                baseY: d.y - this.player.y + this.canvas.height / 2
+            }));
+
+        for (const { drop: d, baseX, baseY } of dropScreenPositions) {
+            const sx = baseX;
+            const sy = baseY;
+
+            // Draw drop with distinctive icon color
+            const color = d.icon_color || '#FFD700';
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw drop type label
+            ctx.fillStyle = color;
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(d.type, sx, sy - 10);
+            
+            // Show quantity if > 1
+            if (d.quantity > 1) {
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 9px Arial';
+                ctx.fillText(`x${d.quantity}`, sx + 8, sy + 8);
+            }
+        }
     }
 
     drawHealth(ctx, x, y, hp = 100) {

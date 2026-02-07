@@ -14,11 +14,15 @@ export default class InputHandler {
     this.network = network;
     this.mapEditor = mapEditor;
     this.keys = {};
+    this.lastGameState = null;  // ← ADD THIS LINE
     window.addEventListener('keydown', e => this.keys[e.key] = true);
     window.addEventListener('keyup', e => this.keys[e.key] = false);
     window.addEventListener('click', e => this.handleClick(e));
     window.addEventListener('mousemove', e => this.handleMouseMove(e));
     this.startSendLoop();
+
+    // Store last state for resource detection
+    this.lastState = null;
   }
 
   handleMouseMove(e) {
@@ -76,7 +80,7 @@ export default class InputHandler {
   }
 
   handleClick(e) {
-    console.log('mouseevent')
+    // console.log('mouseevent')
     // 1. Keep Editor mode unthrottled for better UX
     if (this.mapEditor && this.mapEditor.isActive) {
         const { worldX, worldY } = this.mapEditor.screenToWorld(e.clientX, e.clientY, this.player);
@@ -128,7 +132,38 @@ export default class InputHandler {
       }
     }
 
-    this.network.emit('playerAction', { type, direction: norm, item: equipment });
+    // Try to detect if clicking on a resource or enemy drop
+    let targetResourceId = null;
+
+    // Check distance to resources in the state (if available)
+    if (this.lastState && this.lastState.resources) {
+        for (const resource of this.lastState.resources) {
+            const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
+            if (dist < 30) { // Click range
+                targetResourceId = resource.id;
+                this.network.emit('harvestResource', resourceId);
+                return;
+            }
+        }
+    }
+
+    // DEBUG: Log what we found
+    console.log(`[INPUT] Clicked at world: (${clickX}, ${clickY})`);
+    console.log(`[INPUT] Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
+    if (this.lastGameState && this.lastGameState.resources) {
+      console.log(`[INPUT] Available resources: ${this.lastGameState.resources.length}`);
+      for (const res of this.lastGameState.resources) {
+        const dist = Math.hypot(clickX - res.x, clickY - res.y);
+        console.log(`[INPUT]   Resource ${res.type} at (${res.x}, ${res.y}), distance: ${dist.toFixed(0)}`);
+        if (dist < 40) {
+          console.log(`[INPUT] CLICK HIT RESOURCE! Sending harvestResource event for ID: ${res.id}`);
+          this.network.emit('harvestResource', res.id);
+          return;
+        }
+      }
+    }
+
+    this.network.emit('playerAction', { type, direction: norm, item: equipment, targetResourceId });
 
   }
 }
