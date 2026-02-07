@@ -29,7 +29,9 @@ export class WorldRenderer {
                  : Number.isFinite(player?.y) ? player.y : 0;
 
         for (const key in world.chunks) {
+
             const chunk = world.chunks[key];
+            // console.log(`World: key ${JSON.stringify(chunk)}`)
             if (!chunk) continue;
             const [chunkX, chunkY] = key.split(',').map(Number);
             const biome = chunk.biome || 'plains';
