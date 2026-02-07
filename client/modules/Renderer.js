@@ -1,9 +1,10 @@
 export default class Renderer {
-    constructor(canvas, ctx, player, worldRenderer) {
+    constructor(canvas, ctx, player, worldRenderer, mapEditor = null) {
         this.canvas = canvas;
         this.ctx = ctx;
         this.player = player;
         this.worldRenderer = worldRenderer;
+        this.mapEditor = mapEditor;
     }
 
     render(state) {
@@ -86,6 +87,11 @@ export default class Renderer {
             // Remove dead effects
             if (effect.life <= 0) this.player.activeEffects.splice(index, 1);
         });
+
+        // Draw editor grid if active
+        if (this.mapEditor && this.mapEditor.isActive) {
+          this.mapEditor.drawGrid(ctx, this.player);
+        }
 
     }
 

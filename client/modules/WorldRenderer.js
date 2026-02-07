@@ -1,6 +1,8 @@
-const TILE_SIZE = 32;
-const CHUNK_SIZE = 16;
-const WORLD_CHUNKS = 10;
+
+export const CHUNK_SIZE = 10;
+export const TILE_SIZE = 32;
+export const WORLD_CHUNKS = 10;
+
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size
 
 const TILE_COLORS = {
@@ -28,16 +30,36 @@ export class WorldRenderer {
         const py = Number.isFinite(player?.renderY) ? player.renderY
                  : Number.isFinite(player?.y) ? player.y : 0;
 
+        const canvasWidth = ctx.canvas.width;
+        const canvasHeight = ctx.canvas.height;
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+
+        // Calculate which chunks are within the viewport
+        // Add padding to render chunks slightly off-screen for smooth scrolling
+        const padding = chunkPixelSize;
+        const minScreenX = -padding;
+        const maxScreenX = canvasWidth + padding;
+        const minScreenY = -padding;
+        const maxScreenY = canvasHeight + padding;
+
         for (const key in world.chunks) {
             const chunk = world.chunks[key];
             if (!chunk) continue;
+
             const [chunkX, chunkY] = key.split(',').map(Number);
+            const baseX = chunkX * chunkPixelSize - px + canvasWidth / 2;
+            const baseY = chunkY * chunkPixelSize - py + canvasHeight / 2;
+
+            // Viewport culling: only render if chunk is visible or near-visible
+            if (baseX + chunkPixelSize < minScreenX || baseX > maxScreenX ||
+                baseY + chunkPixelSize < minScreenY || baseY > maxScreenY) {
+                continue; // Skip rendering this chunk
+            }
+
             const biome = chunk.biome || 'plains';
             const color = TILE_COLORS[biome] || TILE_COLORS['plains'];
-            const baseX = chunkX * CHUNK_SIZE * TILE_SIZE - px + ctx.canvas.width / 2;
-            const baseY = chunkY * CHUNK_SIZE * TILE_SIZE - py + ctx.canvas.height / 2;
             ctx.fillStyle = color;
-            ctx.fillRect(baseX, baseY, CHUNK_SIZE * TILE_SIZE, CHUNK_SIZE * TILE_SIZE);
+            ctx.fillRect(baseX, baseY, chunkPixelSize, chunkPixelSize);
         }
     }
 }

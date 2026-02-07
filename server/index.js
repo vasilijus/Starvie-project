@@ -1,10 +1,33 @@
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
-import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE } from "./map/ProceduralMap.js";
+import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE, setHandmadeMap} from "./map/ProceduralMap.js";
 import { Player } from './modules/Player.js';
 import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
 import { generateGUID } from "./util/GUID.js";
+import fs from "fs";
+import path from "path";
+
+// Try to load a saved map from server/maps/map.json
+function loadMapFromFile() {
+  const mapPath = path.join(process.cwd(), 'server', 'maps', 'map.json');
+  console.log(`Map path: ${mapPath}`)
+  try {
+    if (fs.existsSync(mapPath)) {
+      const mapData = fs.readFileSync(mapPath, 'utf8');
+      const chunks = JSON.parse(mapData);
+      console.log(`✓ Loaded map from ${mapPath}`);
+      setHandmadeMap(chunks);
+      return true;
+    }
+  } catch (err) {
+    console.warn(`⚠ Failed to load map: ${err.message}`);
+  }
+  return false;
+}
+
+// Load map at startup
+loadMapFromFile();
 
 const app = express();
 const server = http.createServer(app);
@@ -12,7 +35,13 @@ const io = new Server(server);
 
 app.use(express.static("../client"));
 
+// Initialize world
 const world = generateWorld();
+console.log(`World initialized with chunks: ${Object.keys(world.chunks).length}`);
+console.log(`Sample chunk [0,0]: ${JSON.stringify(world.chunks['0,0'])}`);
+console.log(`Sample chunk [1,1]: ${JSON.stringify(world.chunks['1,1'])}`);
+
+
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size  
 
 const players = {};
@@ -91,7 +120,7 @@ for (let i = 0; i < 100; i++) {
 // setInterval(spawnResources, 5000); // Spawn a new resource every 5 seconds
 
 // Spawn enemies at random positions within the world
-for (let i = 0; i < 101; i++) {
+for (let i = 0; i < 20; i++) {
   const id = `enemy${i}`;
   // const hp = 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
   // enemies.push({
@@ -133,6 +162,42 @@ io.on("connection", socket => {
     if (p && data.name) {
       p.name = data.name;
       console.log(`Player ${socket.id} joined as: ${p.name}`);
+    }
+  });
+
+  // Save map from client editor
+  socket.on("saveMap", (chunksData) => {
+    if (!chunksData || typeof chunksData !== 'object') {
+      console.warn('Invalid map data received');
+      socket.emit('mapSaveResult', { success: false, message: 'Invalid data' });
+      return;
+    }
+    
+    try {
+      // Log what we received
+      console.log(`📥 Received map save request with ${Object.keys(chunksData).length} chunks`);
+      console.log(`  Sample chunk [0,0]: ${JSON.stringify(chunksData['0,0'])}`);
+      
+      // Ensure maps directory exists
+      const mapsDir = path.join(process.cwd(), 'server', 'maps');
+      if (!fs.existsSync(mapsDir)) {
+        fs.mkdirSync(mapsDir, { recursive: true });
+      }
+      
+      const mapPath = path.join(mapsDir, 'map.json');
+      const mapJson = JSON.stringify(chunksData, null, 2);
+      fs.writeFileSync(mapPath, mapJson, 'utf8');
+      
+      // Update server world with new chunks
+      world.chunks = chunksData;
+      console.log(`✓ Map saved and loaded: ${mapPath}`);
+      console.log(`  Sample chunk [0,0] after load: ${JSON.stringify(world.chunks['0,0'])}`);
+      console.log(`  Total chunks: ${Object.keys(world.chunks).length}`);
+      
+      socket.emit('mapSaveResult', { success: true, message: 'Map saved successfully' });
+    } catch (err) {
+      console.error(`✗ Failed to save map: ${err.message}`);
+      socket.emit('mapSaveResult', { success: false, message: err.message });
     }
   });
 
