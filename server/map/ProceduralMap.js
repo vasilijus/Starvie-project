@@ -82,12 +82,50 @@ function generateChunk(cx, cy, seed) {
     }
   }
 
+  // Track occupied tile positions to prevent overlaps
+  const occupiedTiles = new Set();
+
+  // Helper function to find a free nearby tile position
+  function findFreeTilePosition(preferredX, preferredY, maxSearchRadius = 3) {
+    // Check if preferred position is free
+    const key = `${preferredX},${preferredY}`;
+    if (!occupiedTiles.has(key)) {
+      return { x: preferredX, y: preferredY };
+    }
+
+    // Spiral outward to find a free tile
+    for (let radius = 1; radius <= maxSearchRadius; radius++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          // Only check positions on the current radius boundary
+          if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+
+          const checkX = preferredX + dx;
+          const checkY = preferredY + dy;
+
+          // Check bounds
+          if (checkX < 0 || checkX >= CHUNK_SIZE || checkY < 0 || checkY >= CHUNK_SIZE) {
+            continue;
+          }
+
+          const checkKey = `${checkX},${checkY}`;
+          if (!occupiedTiles.has(checkKey)) {
+            return { x: checkX, y: checkY };
+          }
+        }
+      }
+    }
+
+    // If no free position found within search radius, return original with offset anyway
+    return { x: preferredX, y: preferredY };
+  }
+
   // Generate resources based on biome rules
   if (biomeRule.resources) {
     const chunkSeed = cx * 73856093 ^ cy * 19349663 ^ seed; // Generate consistent seed per chunk
     
     for (const resourceRule of biomeRule.resources) {
-      const { type, density } = resourceRule;
+      const { type, density, icon_color } = resourceRule;
       const expectedCount = Math.round((CHUNK_SIZE * CHUNK_SIZE) * density);
 
       for (let i = 0; i < expectedCount; i++) {
@@ -97,18 +135,35 @@ function generateChunk(cx, cy, seed) {
 
         // If random check passes, place resource
         if (randomVal < density) {
-          const randX = Math.floor((Math.sin(chunkSeed + i * 78.233) * 43758.5453) % 1 * CHUNK_SIZE);
-          const randY = Math.floor((Math.sin(chunkSeed + i * 45.164) * 43758.5453) % 1 * CHUNK_SIZE);
+          // Generate random X and Y within chunk bounds (0 to CHUNK_SIZE-1)
+          const randXfrac = (Math.sin(chunkSeed + i * 78.233) * 43758.5453) % 1;
+          const randYfrac = (Math.sin(chunkSeed + i * 45.164) * 43758.5453) % 1;
+          const randX = Math.floor(Math.abs(randXfrac) * CHUNK_SIZE);
+          const randY = Math.floor(Math.abs(randYfrac) * CHUNK_SIZE);
+
+          // Clamp to valid tile positions
+          let tileX = Math.min(randX, CHUNK_SIZE - 1);
+          let tileY = Math.min(randY, CHUNK_SIZE - 1);
+
+          // Find a free position if this one is occupied
+          const freePos = findFreeTilePosition(tileX, tileY);
+          tileX = freePos.x;
+          tileY = freePos.y;
+
+          // Mark this tile as occupied
+          occupiedTiles.add(`${tileX},${tileY}`);
 
           // Convert tile position to world position
-          const worldX = cx * CHUNK_SIZE * TILE_SIZE + randX * TILE_SIZE + TILE_SIZE / 2;
-          const worldY = cy * CHUNK_SIZE * TILE_SIZE + randY * TILE_SIZE + TILE_SIZE / 2;
+          const worldX = cx * CHUNK_SIZE * TILE_SIZE + tileX * TILE_SIZE + TILE_SIZE / 2;
+          const worldY = cy * CHUNK_SIZE * TILE_SIZE + tileY * TILE_SIZE + TILE_SIZE / 2;
 
           resources.push({
             type,
             x: worldX,
             y: worldY,
-            amount: 100
+            icon_color, // Include icon_color from biome rules
+            hp: 100,
+            hpMax: 100
           });
         }
       }

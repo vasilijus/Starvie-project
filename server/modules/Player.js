@@ -17,7 +17,7 @@ export class Player {
     this.level = 1;
     this.xp = 0;
     this.xpToNext = 2;
-    
+    this.inventory = {}; // Initialize as object to track resource quantities
   }
 
 //   takeDamage(amount) {
@@ -105,16 +105,18 @@ export class Player {
             hp: this.hp,
             hpMax: this.hpMax,
             isAlive: this.isAlive,
-            damage: this.damage 
+            damage: this.damage,
+            inventory: this.inventory || {}
         };
     }
 
-    gatherResource(item) {
-        if (!this.inventory) this.inventory = [];
-        if (!this.inventory.item)
-            this.inventory.item = 0;
-        
-        this.inventory.item += 1;
+    gatherResource(resourceType) {
+        if (!this.inventory) this.inventory = {};
+        if (!this.inventory[resourceType]) {
+            this.inventory[resourceType] = 0;
+        }
+        this.inventory[resourceType] += 1;
+        console.log(`Player ${this.id} gathered ${resourceType}. Total: ${this.inventory[resourceType]}`);
     }
 
     move(x, y) {

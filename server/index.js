@@ -38,9 +38,24 @@ app.use(express.static("../client"));
 // Initialize world
 const world = generateWorld();
 console.log(`World initialized with chunks: ${Object.keys(world.chunks).length}`);
-// console.log(`Sample chunk [0,0]: ${JSON.stringify(world.chunks['0,0'])}`); // 194 / 179
-// console.log(`Sample chunk [1,1]: ${JSON.stringify(world.chunks['1,1'])}`);
 
+// Load resources from world chunks
+function loadResourcesFromChunks() {
+  const loadedResources = [];
+  for (const key in world.chunks) {
+    const chunk = world.chunks[key];
+    if (chunk.resources && Array.isArray(chunk.resources)) {
+      // Add icon_color if not present
+      for (const resource of chunk.resources) {
+        resource.id = `resource_${key}_${loadedResources.length}`;
+        resource.hp = resource.hp || 100;
+        resource.hpMax = resource.hpMax || 100;
+        loadedResources.push(resource);
+      }
+    }
+  }
+  return loadedResources;
+}
 
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size  
 
@@ -50,74 +65,13 @@ const enemies = [
   // "enemy1": { x: 500, y: 500, hp: 50 },
   // "enemy2": { x: 1500, y: 1500, hp: 75 }
 ];
-const resources = [
-  // Example resource data
-  // "resource1": { x: 300, y: 300, type: "wood", hp: 100, icon_color: "brown" },
-  // "resource2": { x: 800, y: 800, type: "stone", hp: 100, icon_color: "gray" }
-]
-
-function getBiome(x, y) {
-  const chunkX = Math.floor(x / (CHUNK_SIZE * TILE_SIZE));
-  const chunkY = Math.floor(y / (CHUNK_SIZE * TILE_SIZE));
-  const chunkKey = `${chunkX},${chunkY}`;
-  return world.chunks[chunkKey] ? world.chunks[chunkKey].biome : "unknown";
-}
-
-// function spawnResources() {
-//   const biome = getBiome(Math.random() * WORLD_SIZE, Math.random() * WORLD_SIZE);
-//   const resourceTypes = {
-//     "forest": ["wood", "berries"],
-//     "plains": ["grass", "flowers"],
-//     "desert": ["sand", "cactus"]
-//   };
-//   const type = resourceTypes[biome] ? resourceTypes[biome][Math.floor(Math.random() * resourceTypes[biome].length)] : "unknown";
-//   const id = `resource${Date.now()}`;
-//   resources.push({
-//     id: id,
-//     x: Math.random() * WORLD_SIZE,
-//     y: Math.random() * WORLD_SIZE,
-//     type: type,
-//     biome: biome,
-//     hp: 100 // Resources can have HP to indicate how much can be harvested
-//   });
-// }
+const resources = loadResourcesFromChunks();
 
 function getDistance(x1, y1, x2, y2) {
   const dx = x1 - x2;
   const dy = y1 - y2;
   return Math.sqrt(dx * dx + dy * dy);
 }
-
-function spawnResources(x, y) {
-  const biome = getBiome(x, y);
-  let { resourceType, icon_color } = {};
-  switch (biome) {
-    case "forest":
-      resourceType = "wood";
-      icon_color = "brown";
-      break;
-    case "plains":
-      resourceType = "food";
-      icon_color = "orange";
-      break;
-    case "desert":
-      resourceType = "stone";
-      icon_color = "gray";
-      break;
-    default:
-      resourceType = "unknown";
-      icon_color = "black";
-  }
-  const resourceId = `resource${Date.now()}`;
-  resources.push({ id: resourceId, x, y, type: resourceType, hp: 100, icon_color: icon_color });
-}
-
-
-// Spawn resources
-for (let i = 0; i < 100; i++) {
-  spawnResources(Math.random() * WORLD_SIZE, Math.random() * WORLD_SIZE);
-}
-// setInterval(spawnResources, 5000); // Spawn a new resource every 5 seconds
 
 // Spawn enemies at random positions within the world
 for (let i = 0; i < 20; i++) {
