@@ -1,9 +1,10 @@
+import { BIOME_RULES } from './BiomeRules.js';
 
 export const CHUNK_SIZE = 10;
 export const TILE_SIZE = 32;
 export const WORLD_CHUNKS = 10;
 
-const biomes = ["forest", "plains", "desert"];
+const biomes = ["forest", "plains", "desert", "snow", "swamp"];
 
 function getProceduralBiome(cx, cy, seed) {
   // Later we can swap this with Perlin noise
@@ -69,14 +70,52 @@ export function generateWorld(seed = 1) {
 function generateChunk(cx, cy, seed) {
   const biome = getProceduralBiome(cx, cy, seed);
   const tiles = [];
+  const resources = [];
 
+  // Get biome rules for this biome
+  const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
+
+  // Generate tiles
   for (let y = 0; y < CHUNK_SIZE; y++) {
     for (let x = 0; x < CHUNK_SIZE; x++) {
       tiles.push(biome);
     }
   }
 
-  return { biome, tiles };
+  // Generate resources based on biome rules
+  if (biomeRule.resources) {
+    const chunkSeed = cx * 73856093 ^ cy * 19349663 ^ seed; // Generate consistent seed per chunk
+    
+    for (const resourceRule of biomeRule.resources) {
+      const { type, density } = resourceRule;
+      const expectedCount = Math.round((CHUNK_SIZE * CHUNK_SIZE) * density);
+
+      for (let i = 0; i < expectedCount; i++) {
+        // Use deterministic pseudo-random placement
+        const pseudoRand = Math.sin(chunkSeed + i * 12.9898) * 43758.5453;
+        const randomVal = pseudoRand - Math.floor(pseudoRand);
+
+        // If random check passes, place resource
+        if (randomVal < density) {
+          const randX = Math.floor((Math.sin(chunkSeed + i * 78.233) * 43758.5453) % 1 * CHUNK_SIZE);
+          const randY = Math.floor((Math.sin(chunkSeed + i * 45.164) * 43758.5453) % 1 * CHUNK_SIZE);
+
+          // Convert tile position to world position
+          const worldX = cx * CHUNK_SIZE * TILE_SIZE + randX * TILE_SIZE + TILE_SIZE / 2;
+          const worldY = cy * CHUNK_SIZE * TILE_SIZE + randY * TILE_SIZE + TILE_SIZE / 2;
+
+          resources.push({
+            type,
+            x: worldX,
+            y: worldY,
+            amount: 100
+          });
+        }
+      }
+    }
+  }
+
+  return { biome, tiles, resources };
 }
 
 export function getChunk(cx, cy, seed = 1) {
@@ -85,10 +124,13 @@ export function getChunk(cx, cy, seed = 1) {
   // 1) Handmade chunk exists → use it
   if (handmadeChunks && handmadeChunks[key]) {
     const biome = handmadeChunks[key].biome;
+    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
+    
+    // Add resources from biome rules for handmade chunks too
+    const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
+    const resources = handmadeChunks[key].resources || [];
 
-    // rebuild tiles from biome
-    const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome); // 8 = 8 * 8 = 64
-    return { biome, tiles };
+    return { biome, tiles, resources };
   }
 
   // 2) Otherwise → procedural chunk

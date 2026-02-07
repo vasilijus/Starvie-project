@@ -38,8 +38,8 @@ app.use(express.static("../client"));
 // Initialize world
 const world = generateWorld();
 console.log(`World initialized with chunks: ${Object.keys(world.chunks).length}`);
-console.log(`Sample chunk [0,0]: ${JSON.stringify(world.chunks['0,0'])}`);
-console.log(`Sample chunk [1,1]: ${JSON.stringify(world.chunks['1,1'])}`);
+// console.log(`Sample chunk [0,0]: ${JSON.stringify(world.chunks['0,0'])}`); // 194 / 179
+// console.log(`Sample chunk [1,1]: ${JSON.stringify(world.chunks['1,1'])}`);
 
 
 const WORLD_SIZE = WORLD_CHUNKS * CHUNK_SIZE * TILE_SIZE; // Calculate world size based on chunks, chunk size, and tile size  
@@ -176,7 +176,7 @@ io.on("connection", socket => {
     try {
       // Log what we received
       console.log(`📥 Received map save request with ${Object.keys(chunksData).length} chunks`);
-      console.log(`  Sample chunk [0,0]: ${JSON.stringify(chunksData['0,0'])}`);
+      // console.log(`  Sample chunk [0,0]: ${JSON.stringify(chunksData['0,0'])}`);
       
       // Ensure maps directory exists
       const mapsDir = path.join(process.cwd(), 'server', 'maps');
@@ -191,7 +191,7 @@ io.on("connection", socket => {
       // Update server world with new chunks
       world.chunks = chunksData;
       console.log(`✓ Map saved and loaded: ${mapPath}`);
-      console.log(`  Sample chunk [0,0] after load: ${JSON.stringify(world.chunks['0,0'])}`);
+      // console.log(`  Sample chunk [0,0] after load: ${JSON.stringify(world.chunks['0,0'])}`);
       console.log(`  Total chunks: ${Object.keys(world.chunks).length}`);
       
       socket.emit('mapSaveResult', { success: true, message: 'Map saved successfully' });
