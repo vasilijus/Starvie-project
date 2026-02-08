@@ -17,12 +17,12 @@ canvas.height = window.innerHeight;
 let lastState = undefined;
 
 
-
 // Landing page elements
 const landing = document.getElementById("landing");
 const socketIdSpan = document.getElementById("socketId");
 const playerNameInput = document.getElementById("playerName");
 const playBtn = document.getElementById("playBtn");
+
 
 // Initialize network
 const network = new Network();
@@ -37,6 +37,7 @@ network.on('connect', () => {
   playBtn.disabled = false; // Enable play button once connected
 });
 
+
 // Play button handler
 let gameStarted = false;
 playBtn.addEventListener('click', () => {
@@ -49,13 +50,13 @@ playBtn.addEventListener('click', () => {
   player.activeEffects = [];
 
   network.on('hitEffect', (effectData) => {
-      player.activeEffects.push({
-          x: effectData.x,
-          y: effectData.y,
-          life: 1.0,
-          decay: 0.05,
-          type: effectData.type
-      });
+    player.activeEffects.push({
+      x: effectData.x,
+      y: effectData.y,
+      life: 1.0,
+      decay: 0.05,
+      type: effectData.type
+    });
   });
 
   network.emit('playerJoin', { name: playerName });
@@ -63,25 +64,16 @@ playBtn.addEventListener('click', () => {
   const worldRenderer = new WorldRenderer();
   const mapEditor = new MapEditor(canvas, ctx, player, worldRenderer, network);
 
-    // In setup/constructor:
-const craftingRules = new CraftingRules();
-const craftingPanel = new CraftingPanel({ x: 250, y: 10 });
-craftingPanel.setRules(craftingRules);
+  // In setup/constructor:
+  const craftingRules = new CraftingRules();
+  const craftingPanel = new CraftingPanel({ x: 250, y: 10 });
+  craftingPanel.setRules(craftingRules);
 
   const renderer = new Renderer(canvas, ctx, player, worldRenderer, mapEditor, craftingPanel);
   const input = new InputHandler(canvas, player, network, mapEditor, craftingPanel);
 
   // Status panel (inventory + hotbar)
   const statusPanel = new StatusPanel({ x: 10, y: 10, width: 220, height: 160 });
-
-
-// Add keyboard listener for 'C':
-// window.addEventListener('keydown', (e) => {
-//     if (e.key.toLowerCase() === 'c') {
-//         craftingPanel.toggle();
-//     }
-// });
-
 
   let worldInitialized = false;
 
@@ -114,6 +106,7 @@ craftingPanel.setRules(craftingRules);
     }
     requestAnimationFrame(loop);
   }
+
   loop();
 });
 
@@ -124,5 +117,3 @@ playerNameInput.addEventListener('keydown', (e) => {
     playBtn.click();
   }
 });
-
-// addEventListener()
