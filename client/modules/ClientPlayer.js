@@ -23,6 +23,12 @@ export class ClientPlayer {
     // Inventory (synced from server)
     this.inventory = {};
     
+    // Hotbar / quickslots (client-local)
+this.hotbarSize = 5;
+this.hotbar = new Array(this.hotbarSize).fill(null); // each slot: { type: 'axe' } or null
+this.selectedHotbarIndex = 0;
+this.equipment = null; // currently equipped item type (string) or null
+
     // Local UI state
     this.isAlive = true;
     this.facingDirection = { x: 0, y: -1 };
@@ -87,6 +93,30 @@ export class ClientPlayer {
     this.attackDirection = direction || { x: 0, y: -1 };
     console.log(`[ClientPlayer] startAttack: dir=(${this.attackDirection.x.toFixed(2)}, ${this.attackDirection.y.toFixed(2)}), duration=${this.attackDuration}`);
   }
+
+
+  // Select a hotbar slot (index 0..hotbarSize-1)
+selectHotbar(index) {
+  if (index < 0 || index >= this.hotbarSize) return;
+  this.selectedHotbarIndex = index;
+  const slot = this.hotbar[index];
+  this.equipment = slot ? slot.type : null;
+  console.log(`[ClientPlayer] hotbar select ${index} -> ${this.equipment}`);
+}
+
+// Set a hotbar slot explicitly (type is string, e.g. 'axe')
+setHotbarSlot(index, type) {
+  if (index < 0 || index >= this.hotbarSize) return;
+  this.hotbar[index] = type ? { type } : null;
+  // if setting current selected slot, update equipment
+  if (this.selectedHotbarIndex === index) this.equipment = type || null;
+}
+
+// Get currently selected item type
+getSelectedItem() {
+  return this.equipment;
+}
+
 
   /**
    * Set player facing direction
