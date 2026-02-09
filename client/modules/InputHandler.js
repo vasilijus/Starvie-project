@@ -77,10 +77,10 @@ export default class InputHandler {
             }
 
             const dir = { x: 0, y: 0 };
-            if (this.keys['w']) dir.y -= 1;
-            if (this.keys['s']) dir.y += 1;
-            if (this.keys['a']) dir.x -= 1;
-            if (this.keys['d']) dir.x += 1;
+            if (this.keys['w']) dir.y -= 1 * this.player.speed;
+            if (this.keys['s']) dir.y += 1 * this.player.speed;
+            if (this.keys['a']) dir.x -= 1 * this.player.speed;
+            if (this.keys['d']) dir.x += 1 * this.player.speed;
 
             // hotbar quick-select
             if (this.keys['1']) this.player.selectHotbar(0);
@@ -152,34 +152,45 @@ export default class InputHandler {
         this.player.facingDirection = norm;
 
         if (type === 'attack') {
-            try { this.player.startAttack(norm); } catch (err) { }
-        }
+            try {
+                this.player.startAttack(norm); 
+            } catch (err) { }
+            
+        } else {
+            // If not attacking, it's an interaction (e.g., right-click)
+            try {
 
-        // Try to detect clicking on resources or drops using the last server state
-        const state = this.lastState || {};
-        const maxClickRange = 40;
+                // this.player.startInteract(norm);
+                
+                // Try to detect clicking on resources or drops using the last server state
+                const state = this.lastState || {};
+                const maxClickRange = 40;
 
-        if (state.resources && Array.isArray(state.resources)) {
-            for (const resource of state.resources) {
-                const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
-                if (dist < maxClickRange) {
-                    // Hit an environment resource
-                    this.network.emit('harvestResource', resource.id);
-                    return; // don't send playerAction
+                if (state.resources && Array.isArray(state.resources)) {
+                    for (const resource of state.resources) {
+                        const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
+                        if (dist < maxClickRange) {
+                            // Hit an environment resource
+                            this.network.emit('harvestResource', resource.id);
+                            return; // don't send playerAction
+                        }
+                    }
                 }
-            }
+
+                if (state.enemyDrops && Array.isArray(state.enemyDrops)) {
+                    for (const drop of state.enemyDrops) {
+                        const dist = Math.hypot(clickX - drop.x, clickY - drop.y);
+                        if (dist < maxClickRange) {
+                            // Hit an enemy drop
+                            this.network.emit('harvestResource', drop.id);
+                            return;
+                        }
+                    }
+                }
+
+            } catch (err) { }
         }
 
-        if (state.enemyDrops && Array.isArray(state.enemyDrops)) {
-            for (const drop of state.enemyDrops) {
-                const dist = Math.hypot(clickX - drop.x, clickY - drop.y);
-                if (dist < maxClickRange) {
-                    // Hit an enemy drop
-                    this.network.emit('harvestResource', drop.id);
-                    return;
-                }
-            }
-        }
 
         // fallback: send a generic playerAction
         this.network.emit('playerAction', { type, direction: norm, item: equipment, targetResourceId: null });
