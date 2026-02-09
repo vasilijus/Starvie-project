@@ -4,8 +4,11 @@ import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE, setHandmadeMap } from "./map/ProceduralMap.js";
 import { ServerPlayer } from './modules/ServerPlayer.js';
 import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
-import { generateGUID } from "./util/GUID.js";
+// import { generateGUID } from "./util/GUID.js";
 import { ResourceFactory } from "./modules/resources/ResourceFactory.js";
+import { getHitPoint, findHitEnemy, findHitResource } from "./gameplay/TargetingSystem.js";
+import { attackEnemy } from "./gameplay/CombatSystem.js";
+import { harvestWorldResource } from "./gameplay/HarvestSystem.js";
 import fs from "fs";
 import path from "path";
 
@@ -88,14 +91,6 @@ function getDistance(x1, y1, x2, y2) {
 // Spawn enemies at random positions within the world
 for (let i = 0; i < 20; i++) {
     const id = `enemy${i}`;
-    // const hp = 50 + Math.floor(Math.random() * 50) // Random HP between 50 and 100
-    // enemies.push({
-    //   id: id,
-    //   x: Math.floor(Math.random() * WORLD_SIZE),
-    //   y: Math.floor(Math.random() * WORLD_SIZE),
-    //   hp: hp,
-    //   hpMax: hp 
-    // });
     const num = Math.floor(Math.random() * EN_TYPES);
     let mob;
     // const id = generateGUID();
@@ -110,7 +105,6 @@ for (let i = 0; i < 20; i++) {
             break;
     }
 
-    // console.log(`Mob: ${JSON.stringify(mob)}`)
     enemies.push(mob)
 }
 
@@ -250,76 +244,32 @@ io.on("connection", socket => {
         }
     });
 
-    socket.on('playerAction', (data) => {
-
+    socket.on("playerAction", (data) => {
         const player = players[socket.id];
-        if (!player || !player.isAlive) return;
+        if (!player?.isAlive) return;
 
-        const reach = 40; // How far the player reaches
-        const hitRadius = 30; // The size of the "hit" area
+        const hitPoint = getHitPoint(player, data.direction);
 
+        // 1️⃣ Try hit enemy first
+        const enemy = findHitEnemy(hitPoint, enemies);
 
-        // 1. Calculate the exact point in the world the player is "hitting"
-        const hitX = player.x + (data.direction.x * reach);
-        const hitY = player.y + (data.direction.y * reach);
+        if (enemy) {
+            const result = attackEnemy(player, enemy, enemyDrops);
 
-        // 2. Check for Enemies (Combat Logic)
-        // We look for any enemy close to our hit point
-        const hitEnemy = enemies.find(enemy =>
-            getDistance(hitX, hitY, enemy.x, enemy.y) < hitRadius
-        );
-
-        if (hitEnemy) {
-            // Apply damage logic
-            const baseDamage = player.stats.damage;
-
-            const multiplier = data.weapon ? 2.5 : 1.0;
-            const totalDamage = baseDamage * multiplier;
-
-            hitEnemy.hp -= totalDamage;
-            console.log(`Player hit ${hitEnemy.id} for ${totalDamage} dmg! (x:${player.x}/y:${player.y})`);
-
-            // Remove enemy if dead
-            if (hitEnemy.hp <= 0) {
-                const index = enemies.indexOf(hitEnemy);
+            if (result.killed) {
+                const index = enemies.indexOf(enemy);
                 enemies.splice(index, 1);
-
-                // Generate resource drops from defeated enemy
-                const drops = hitEnemy.getResourceDrops();
-                enemyDrops.push(...drops);
-                console.log(`Enemy ${hitEnemy.id} defeated! Generated ${drops.length} resource drops`);
-
-                // Player gains experience
-                player.addXP(hitEnemy.xpWorth)
             }
 
-            io.emit('hitEffect', { x: hitX, y: hitY, type: 'combat' })
-            return; // Stop here if we hit an enemy
+            io.emit('hitEffect', { x: hitPoint.x, y: hitPoint.y, type: 'combat' });
+            return;
         }
 
-        // 3. Check for Resources (Gathering Logic)
-        // If no enemy was hit, check if we clicked a resource
-        const hitResource = resources.find(res =>
-            getDistance(hitX, hitY, res.x, res.y) < 25
-        );
+        // 2️⃣ Otherwise try harvest resource
+        const resource = findHitResource(hitPoint, resources);
 
-        if (hitResource && hitResource.canHarvest && typeof hitResource.canHarvest === 'function') {
-            console.log(`Gathering resource: ${hitResource.type}`);
-
-            const harvested = hitResource.harvestResources();
-            if (harvested) {
-                // Add harvested items to player inventory
-                for (const [itemType, amount] of Object.entries(harvested)) {
-                    if (itemType !== 'xpReward') {
-                        player.inventory.addResource(itemType, amount);
-                    } else {
-                        player.addXP(amount);
-                    }
-                }
-                console.log(`Player: ${player.id} - ${player.name} harvested: ${JSON.stringify(harvested)}`);
-            }
-
-            io.emit('hitEffect', { x: hitX, y: hitY, type: 'gather' })
+        if (resource && harvestWorldResource(player, resource)) {
+            io.emit('hitEffect', { x: hitPoint.x, y: hitPoint.y, type: 'gather' });
         }
     });
 
@@ -330,177 +280,194 @@ io.on("connection", socket => {
 });
 
 
-// Broadcast game state to all clients at 30 FPS
-setInterval(() => {
-    // =========================
-    // UPDATE RESOURCES (RESPAWN)
-    // =========================
-    if (resources.length > 0) {
-        // console.log(`[GAME LOOP] Updating ${resources.length} resources for respawn...`);
-    }
-    for (const resource of resources) {
-        if (resource.updateRespawn) {
-            resource.updateRespawn(1000 / 30); // ~33ms per frame at 30 FPS
+// --------------------------------------------------
+// PERFORMANCE HELPERS
+// --------------------------------------------------
+
+// Squared distance (avoids expensive sqrt every frame)
+const getDistSq = (x1, y1, x2, y2) => {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    return dx * dx + dy * dy;
+};
+
+const clampToWorld = (entity) => {
+    entity.x = Math.max(0, Math.min(WORLD_SIZE, entity.x));
+    entity.y = Math.max(0, Math.min(WORLD_SIZE, entity.y));
+};
+
+
+// --------------------------------------------------
+// PLAYER SYSTEM
+// --------------------------------------------------
+
+function getAlivePlayers() {
+    const alive = [];
+
+    for (const id in players) {
+        const p = players[id];
+
+        if (p.hp <= 0) {
+            delete players[id]; // cleanup happens ONCE per frame
+            continue;
         }
+
+        alive.push(p);
     }
 
-    // Clean up collected enemy drops
+    return alive;
+}
+
+
+// --------------------------------------------------
+// RESOURCE SYSTEM
+// --------------------------------------------------
+
+function updateResources(delta) {
+    for (const r of resources) {
+        r.updateRespawn?.(delta);
+    }
+}
+
+function cleanupDrops() {
     for (let i = enemyDrops.length - 1; i >= 0; i--) {
         if (enemyDrops[i].shouldDespawn()) {
             enemyDrops.splice(i, 1);
         }
     }
-
-    // =========================
-    // ENEMY AI & INTERACTIONS
-    // =========================
-    for (const enemy of enemies) {
-        let closestPlayer = null;
-        let distance = Infinity;
-        let alivePlayers = [];
-        // // If no players are connected, skip AI processing
-        // if (Object.keys(players).length === 0) continue;
-
-        // Check if player is within a certain range (e.g., 300 units)
-        for (const id in players) {
-            const p = players[id];
-            if (!checkIfPlayerAlive(p)) {
-                delete players[id]; // Remove dead player from the game
-            } else {
-                alivePlayers.push(p);
-            }
-        }
-
-        if (alivePlayers.length === 0) continue; // Skip if no alive players
-        else {
-
-            for (const p of alivePlayers) {
-                const dx = p.x - enemy.x;
-                const dy = p.y - enemy.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < distance) {
-                    distance = dist;
-                    closestPlayer = p;
-                }
-            }
-        }
-
-        const huntRange = 200; // Distance at which enemies will start chasing players
-        if (distance < huntRange && closestPlayer) {
-            // Calculate new position
-            const angle = Math.atan2(closestPlayer.y - enemy.y, closestPlayer.x - enemy.x);
-            const newX = enemy.x + Math.cos(angle) * 2; // Enemy speed
-            const newY = enemy.y + Math.sin(angle) * 2;
-
-            // Check collision with closest player (20px collision radius: 10 for enemy + 10 for player)
-            const collisionDistance = 20;
-            const dx = newX - closestPlayer.x;
-            const dy = newY - closestPlayer.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Only move if no collision
-            if (dist > collisionDistance) {
-                enemy.x = newX;
-                enemy.y = newY;
-            }
-            // Otherwise enemy stops (doesn't move)
-        } else {
-            // Random movement with same collision check
-            if (!enemy.moveDirection || Math.random() < 0.01) {
-                const angle = Math.random() * 2 * Math.PI;
-                enemy.moveDirection = { x: Math.cos(angle), y: Math.sin(angle) };
-            }
-            const newX = enemy.x + enemy.moveDirection.x * 1;
-            const newY = enemy.y + enemy.moveDirection.y * 1;
-
-            // Check collision with all alive players
-            let canMove = true;
-            for (const p of alivePlayers) {
-                const collisionDistance = 20; // 10px each
-                const dx = newX - p.x;
-                const dy = newY - p.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist <= collisionDistance) {
-                    canMove = false;
-                    break;
-                }
-            }
-
-            if (canMove) {
-                enemy.x = newX;
-                enemy.y = newY;
-            }
-        }
-
-        // Keep enemy within world bounds
-        enemy.x = Math.max(0, Math.min(WORLD_SIZE, enemy.x));
-        enemy.y = Math.max(0, Math.min(WORLD_SIZE, enemy.y));
+}
 
 
-        // Check if player HP is reduced to 0 or below and remove player from the game
-        if (closestPlayer && closestPlayer.hp <= 0) {
-            console.log('collision')
-            // Find the player ID to remove from the players object
-            for (const id in players) {
-                if (players[id] === closestPlayer.id) {
-                    players[id].hp = 0; // Set player HP to 0 to indicate they are "dead"
-                    players[id].isAlive = false; // Mark player as not alive
-                    delete players[id];
-                    break;
-                }
-            }
-        }
+// --------------------------------------------------
+// ENEMY SYSTEM
+// --------------------------------------------------
 
-        // Enemies attack player if close enough
-        // Check for collisions with players and reduce HP
-        if (closestPlayer) {
-            const dx = closestPlayer.x - enemy.x;
-            const dy = closestPlayer.y - enemy.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const attackRange = 25; // Range at which enemy deals damage
+const HUNT_RANGE_SQ = 200 * 200;
+const COLLISION_SQ = 20 * 20;
+const ATTACK_RANGE_SQ = 25 * 25;
 
-            if (dist < attackRange) {
-                // Attack once per second (every 30 frames at 30 FPS)
-                if (!enemy.lastAttackTime) enemy.lastAttackTime = 0;
+function findClosestPlayer(enemy, alivePlayers) {
+    let closest = null;
+    let bestDist = Infinity;
 
-                const now = Date.now();
-                if (now - enemy.lastAttackTime > 1000) { // 1 second cooldown
-                    closestPlayer.takeDamage(10); // Enemy damage per hita
-                    enemy.lastAttackTime = now;
-                    // console.log(`Enemy ${enemy.id} attacks player! ${(closestPlayer.name ?? closestPlayer.name) || closestPlayer.id } HP: ${closestPlayer.stats.hp} (x:${Math.floor(enemy.x)}/y:${Math.floor(enemy.y)})`);
-                }
-            }
+    for (const p of alivePlayers) {
+        const d = getDistSq(enemy.x, enemy.y, p.x, p.y);
+        if (d < bestDist) {
+            bestDist = d;
+            closest = p;
         }
     }
 
+    return { closest, bestDist };
+}
 
-    // Broadcast updated game state to all clients
+function moveEnemyTowards(enemy, target) {
+    const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+    const newX = enemy.x + Math.cos(angle) * 2;
+    const newY = enemy.y + Math.sin(angle) * 2;
+
+    // prevent overlapping player
+    if (getDistSq(newX, newY, target.x, target.y) > COLLISION_SQ) {
+        enemy.x = newX;
+        enemy.y = newY;
+    }
+}
+
+function moveEnemyRandom(enemy, alivePlayers) {
+    if (!enemy.moveDirection || Math.random() < 0.01) {
+        const angle = Math.random() * Math.PI * 2;
+        enemy.moveDirection = { x: Math.cos(angle), y: Math.sin(angle) };
+    }
+
+    const newX = enemy.x + enemy.moveDirection.x;
+    const newY = enemy.y + enemy.moveDirection.y;
+
+    // avoid bumping into players
+    for (const p of alivePlayers) {
+        if (getDistSq(newX, newY, p.x, p.y) <= COLLISION_SQ) return;
+    }
+
+    enemy.x = newX;
+    enemy.y = newY;
+}
+
+function enemyAttack(enemy, player) {
+    if (getDistSq(enemy.x, enemy.y, player.x, player.y) > ATTACK_RANGE_SQ) return;
+
+    const now = Date.now();
+    if (!enemy.lastAttackTime) enemy.lastAttackTime = 0;
+
+    if (now - enemy.lastAttackTime > 1000) {
+        player.takeDamage(10);
+        enemy.lastAttackTime = now;
+    }
+}
+
+function updateEnemies(alivePlayers) {
+    if (alivePlayers.length === 0) return;
+
+    for (const enemy of enemies) {
+        const { closest, bestDist } = findClosestPlayer(enemy, alivePlayers);
+
+        if (closest && bestDist < HUNT_RANGE_SQ) {
+            moveEnemyTowards(enemy, closest);
+            enemyAttack(enemy, closest);
+        } else {
+            moveEnemyRandom(enemy, alivePlayers);
+        }
+
+        clampToWorld(enemy);
+    }
+}
+
+
+// --------------------------------------------------
+// NETWORK SYSTEM
+// --------------------------------------------------
+
+function broadcastState() {
     const statePlayers = Object.fromEntries(
         Object.entries(players).map(([id, p]) => [id, p.toClient()])
     );
-
-    // Serialize resources and drops for client
-    const serializedResources = resources.map(r =>
-        r.toObject ? r.toObject() : r
-    );
-    const serializedDrops = enemyDrops.map(d => d.toObject());
-
-
-    // DEBUG: Log resource counts
-    if (resources.length > 0) {
-        // console.log(`[STATE BROADCAST] Sending ${serializedResources.length} resources to clients (sample: ${serializedResources[0]?.type})`);
-    }
-
 
     io.emit("state", {
         players: statePlayers,
         enemies,
         world,
-        resources: serializedResources,
-        enemyDrops: serializedDrops
+        resources: resources.map(r => r.toObject?.() ?? r),
+        enemyDrops: enemyDrops.map(d => d.toObject())
     });
+}
 
-}, 1000 / 30);
+
+// Broadcast game state to all clients at 30 FPS
+// --------------------------------------------------
+// MAIN GAME LOOP (30 FPS)
+// --------------------------------------------------
+
+const TICK_RATE = 1000 / 30;
+
+setInterval(() => {
+    const delta = TICK_RATE;
+
+    // 1️⃣ Update resource respawns
+    updateResources(delta);
+
+    // 2️⃣ Remove expired drops
+    cleanupDrops();
+
+    // 3️⃣ Remove dead players once per frame
+    const alivePlayers = getAlivePlayers();
+
+    // 4️⃣ Run enemy AI using cached alive players
+    updateEnemies(alivePlayers);
+
+    // 5️⃣ Send state to clients
+    broadcastState();
+
+}, TICK_RATE);
+
+
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
