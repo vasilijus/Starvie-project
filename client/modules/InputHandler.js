@@ -1,169 +1,187 @@
+// ...existing code...
 let EDIT_MODE = false;
 let selectedBiome = "plains";
 
 const BIOME_COLORS = {
-  plains: "#88c070",
-  forest: "#3f7a2c",
-  desert: "#d9c27a",
-  snow: "#e8f2ff"
+    plains: "#88c070",
+    forest: "#3f7a2c",
+    desert: "#d9c27a",
+    snow: "#e8f2ff"
 };
 export default class InputHandler {
-  constructor(canvas, player, network, mapEditor = null) {
-    this.canvas = canvas;
-    this.player = player;
-    this.network = network;
-    this.mapEditor = mapEditor;
-    this.keys = {};
-    this.lastGameState = null;  // ← ADD THIS LINE
-    window.addEventListener('keydown', e => this.keys[e.key] = true);
-    window.addEventListener('keyup', e => this.keys[e.key] = false);
-    window.addEventListener('click', e => this.handleClick(e));
-    window.addEventListener('mousemove', e => this.handleMouseMove(e));
-    this.startSendLoop();
+    constructor(canvas, player, network, mapEditor = null, craftingPanel = null) {
+        this.canvas = canvas;
+        this.player = player;
+        this.network = network;
+        this.mapEditor = mapEditor;
+        this.craftingPanel = craftingPanel;
+        this.keys = {};
+        this.lastState = null;
 
-    // Store last state for resource detection
-    this.lastState = null;
-  }
+        window.addEventListener('keydown', e => this.keys[e.key] = true);
+        window.addEventListener('keyup', e => this.keys[e.key] = false);
+        window.addEventListener('click', e => this.handleClick(e));
+        window.addEventListener('mousemove', e => this.handleMouseMove(e));
 
-  handleMouseMove(e) {
-    // In editor mode, don't update facing direction
-    if (this.mapEditor && this.mapEditor.isActive) return;
-
-    // Convert screen position to world position (same as click handler)
-    const mouseWorldX = this.player.x - this.canvas.width / 2 + e.clientX;
-    const mouseWorldY = this.player.y - this.canvas.height / 2 + e.clientY;
-
-    // Calculate direction from player to mouse in world space
-    const dx = mouseWorldX - this.player.x;
-    const dy = mouseWorldY - this.player.y;
-    const len = Math.hypot(dx, dy);
-    
-    if (len > 0) {
-      const norm = { x: dx / len, y: dy / len };
-      this.player.facingDirection = norm;
-      // Send to server so all players see the updated direction
-      this.network.emit('playerFacingDirection', norm);
-      // console.log(`[MouseMove] Player: (${this.player.x}, ${this.player.y}), Mouse world: (${mouseWorldX}, ${mouseWorldY}), Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
+        this.startSendLoop();
     }
-  }
 
-  startSendLoop() {
-    const send = () => {
-      // Editor mode toggle
-      if (this.keys['m']) {
-        if (!this.mPressed) {
-          if (this.mapEditor) {
-            this.mapEditor.toggle();
-          }
-          this.mPressed = true;
+    handleMouseMove(e) {
+        if (this.mapEditor && this.mapEditor.isActive) return;
+
+        const mouseWorldX = this.player.x - this.canvas.width / 2 + e.clientX;
+        const mouseWorldY = this.player.y - this.canvas.height / 2 + e.clientY;
+
+        const dx = mouseWorldX - this.player.x;
+        const dy = mouseWorldY - this.player.y;
+        const len = Math.hypot(dx, dy);
+
+        if (len > 0) {
+            const norm = { x: dx / len, y: dy / len };
+            this.player.facingDirection = norm;
+            this.network.emit('playerFacingDirection', norm);
         }
-      } else {
-        this.mPressed = false;
-      }
-
-      // In editor mode, don't send movement input
-      if (this.mapEditor && this.mapEditor.isActive) {
-        requestAnimationFrame(send);
-        return;
-      }
-
-      const dir = { x: 0, y: 0 };
-      if (this.keys['w']) dir.y -= 1;
-      if (this.keys['s']) dir.y += 1;
-      if (this.keys['a']) dir.x -= 1;
-      if (this.keys['d']) dir.x += 1;
-
-      this.network.emit('playerInput', dir);
-      requestAnimationFrame(send);
-    };
-    send();
-  }
-
-  handleClick(e) {
-    // console.log('mouseevent')
-    // 1. Keep Editor mode unthrottled for better UX
-    if (this.mapEditor && this.mapEditor.isActive) {
-        const { worldX, worldY } = this.mapEditor.screenToWorld(e.clientX, e.clientY, this.player);
-        this.mapEditor.paintChunk(worldX, worldY);
-        return;
     }
 
-    // 2. Determine if this is an attack
-    // Treat left-click as an attack for immediate feedback and gameplay
-    // (click event uses button==0 for left click)
-    const isLeftClick = e && typeof e.button === 'number' && e.button === 0;
-    const equipment = this.player.equipment || 'none';
-    const isMeleeEquipped = (equipment === 'sword' || equipment === 'axe');
-    const type = (isMeleeEquipped || isLeftClick) ? 'attack' : 'interact';
+    startSendLoop() {
+        const send = () => {
+            if (this.keys['m']) {
+                if (!this.mPressed) {
+                    if (this.mapEditor) this.mapEditor.toggle();
+                    this.mPressed = true;
+                }
+            } else {
+                this.mPressed = false;
+            }
 
-    // 3. Apply Throttle Logic
-    if (type === 'attack') {
-        const now = Date.now();
-        // Calculate delay in ms (e.g., 2 speed = 500ms delay)
-        const attackDelay = 2000 / this.player.attackSpeed; 
+            // Toggle crafting panel with 'C'
+            if (this.keys['c'] || this.keys['C']) {
+                if (!this.cPressed) {
+                    console.log('C pressed, craftingPanel:', this.craftingPanel);
+                    console.log('craftingPanel.isOpen before toggle:', this.craftingPanel?.isOpen);
+                    if (this.craftingPanel) {
+                        this.craftingPanel.toggle();
+                        console.log('craftingPanel.isOpen after toggle:', this.craftingPanel.isOpen);
+                    } else {
+                        console.warn('craftingPanel is null!');
+                    }
+                    this.cPressed = true;
+                }
+            } else {
+                this.cPressed = false;
+            }
 
-        if (now - this.player.lastAttackTime < attackDelay) {
-            console.log('Attack on cooldown...');
-            return; // Exit function; click is ignored
-        }
-
-        // Update the timestamp only on a successful attack
-        this.player.lastAttackTime = now;
-    }
-
-    // 4. Existing Logic (Positioning & Emitting)
-    const clickX = this.player.x - this.canvas.width / 2 + e.clientX;
-    const clickY = this.player.y - this.canvas.height / 2 + e.clientY;
-    const dx = clickX - this.player.x;
-    const dy = clickY - this.player.y;
-    const len = Math.hypot(dx, dy);
-    if (len === 0) return;
-
-    const norm = { x: dx / len, y: dy / len };
-    this.player.facingDirection = norm;
-
-    // If this is an attack, start local attack animation for immediate feedback
-    if (type === 'attack') {
-      try { 
-        // console.log('[InputHandler] attack click -> start local animation');
-        this.player.startAttack(norm);
-      } catch(err) {
-        // defensive: if player doesn't have startAttack, ignore
-      }
-    }
-
-    // Try to detect if clicking on a resource or enemy drop
-    let targetResourceId = null;
-
-    // Check distance to resources in the state (if available)
-    if (this.lastState && this.lastState.resources) {
-        for (const resource of this.lastState.resources) {
-            const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
-            if (dist < 30) { // Click range
-                targetResourceId = resource.id;
-                this.network.emit('harvestResource', resourceId);
+            if (this.mapEditor && this.mapEditor.isActive) {
+                requestAnimationFrame(send);
                 return;
             }
-        }
+
+            const dir = { x: 0, y: 0 };
+            if (this.keys['w']) dir.y -= 1;
+            if (this.keys['s']) dir.y += 1;
+            if (this.keys['a']) dir.x -= 1;
+            if (this.keys['d']) dir.x += 1;
+
+            // hotbar quick-select
+            if (this.keys['1']) this.player.selectHotbar(0);
+            if (this.keys['2']) this.player.selectHotbar(1);
+            if (this.keys['3']) this.player.selectHotbar(2);
+            if (this.keys['4']) this.player.selectHotbar(3);
+            if (this.keys['5']) this.player.selectHotbar(4);
+
+            this.network.emit('playerInput', dir);
+            requestAnimationFrame(send);
+        };
+        send();
     }
 
-    // DEBUG: Log what we found
-    console.log(`[INPUT] Clicked at world: (${clickX}, ${clickY})`);
-    console.log(`[INPUT] Direction: (${norm.x.toFixed(2)}, ${norm.y.toFixed(2)})`);
-    if (this.lastGameState && this.lastGameState.resources) {
-      console.log(`[INPUT] Available resources: ${this.lastGameState.resources.length}`);
-      for (const res of this.lastGameState.resources) {
-        const dist = Math.hypot(clickX - res.x, clickY - res.y);
-        console.log(`[INPUT]   Resource ${res.type} at (${res.x}, ${res.y}), distance: ${dist.toFixed(0)}`);
-        if (dist < 40) {
-          console.log(`[INPUT] CLICK HIT RESOURCE! Sending harvestResource event for ID: ${res.id}`);
-          this.network.emit('harvestResource', res.id);
-          return;
+    handleClick(e) {
+        // Check for craft button clicks first (if panel is open)
+        if (this.craftingPanel && this.craftingPanel.isOpen) {
+            console.log('Crafting panel is open, checking for clicks...');
+            const craftingRules = this.craftingPanel.craftingRules;
+            if (craftingRules && craftingRules.recipes) {
+                for (let i = 0; i < craftingRules.recipes.length; i++) {
+                    const area = this.craftingPanel.getClickableArea(i);
+                    if (area) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const clickY = e.clientY - rect.top;
+                        console.log(`Recipe ${i} clickable area:`, area, `Click coords:`, clickX, clickY);
+
+                        if (clickX >= area.x && clickX < area.x + area.w &&
+                            clickY >= area.y && clickY < area.y + area.h) {
+                            console.log(`Clicked craft button for recipe ${i}`);
+                            this.craftingPanel.queueCraft(this.player, i);
+                            return;
+                        }
+                    }
+                }
+            }
         }
-      }
+
+        if (this.mapEditor && this.mapEditor.isActive) {
+            const { worldX, worldY } = this.mapEditor.screenToWorld(e.clientX, e.clientY, this.player);
+            this.mapEditor.paintChunk(worldX, worldY);
+            return;
+        }
+
+        const isLeftClick = e && typeof e.button === 'number' && e.button === 0;
+        const equipment = this.player.equipment || 'none';
+        const isMeleeEquipped = (equipment === 'sword' || equipment === 'axe');
+        const type = (isMeleeEquipped || isLeftClick) ? 'attack' : 'interact';
+
+        if (type === 'attack') {
+            const now = Date.now();
+            const attackDelay = 2000 / this.player.attackSpeed;
+            if (now - this.player.lastAttackTime < attackDelay) {
+                // on cooldown
+                return;
+            }
+            this.player.lastAttackTime = now;
+        }
+
+        const clickX = this.player.x - this.canvas.width / 2 + e.clientX;
+        const clickY = this.player.y - this.canvas.height / 2 + e.clientY;
+        const dx = clickX - this.player.x;
+        const dy = clickY - this.player.y;
+        const len = Math.hypot(dx, dy);
+        if (len === 0) return;
+
+        const norm = { x: dx / len, y: dy / len };
+        this.player.facingDirection = norm;
+
+        if (type === 'attack') {
+            try { this.player.startAttack(norm); } catch (err) { }
+        }
+
+        // Try to detect clicking on resources or drops using the last server state
+        const state = this.lastState || {};
+        const maxClickRange = 40;
+
+        if (state.resources && Array.isArray(state.resources)) {
+            for (const resource of state.resources) {
+                const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
+                if (dist < maxClickRange) {
+                    // Hit an environment resource
+                    this.network.emit('harvestResource', resource.id);
+                    return; // don't send playerAction
+                }
+            }
+        }
+
+        if (state.enemyDrops && Array.isArray(state.enemyDrops)) {
+            for (const drop of state.enemyDrops) {
+                const dist = Math.hypot(clickX - drop.x, clickY - drop.y);
+                if (dist < maxClickRange) {
+                    // Hit an enemy drop
+                    this.network.emit('harvestResource', drop.id);
+                    return;
+                }
+            }
+        }
+
+        // fallback: send a generic playerAction
+        this.network.emit('playerAction', { type, direction: norm, item: equipment, targetResourceId: null });
     }
-
-    this.network.emit('playerAction', { type, direction: norm, item: equipment, targetResourceId });
-
-  }
 }
