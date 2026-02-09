@@ -7,7 +7,7 @@ export class PlayerStats {
         this.hp = 100;
         this.hpMax = 100;
         this.damage = 10;
-        this.speed = 5;
+        this.speed = 2.5;
         this.size = 20;
         this.level = 1;
 

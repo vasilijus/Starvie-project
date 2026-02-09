@@ -55,7 +55,7 @@ export default class Renderer {
         const playerScreenY = this.canvas.height / 2;
         // console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
         // Testing debug
-        // this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
+        this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
 
         // enemies
         for (const enemy of enemies) {
@@ -115,12 +115,6 @@ export default class Renderer {
                 }
             }
         }
-        // Rm 88 - 115 / 123 - 126
-        // // Draw all resources at their world positions (no client-side separation)
-        // // Server-side spatial checking prevents overlap at spawn time
-        // for (const { resource: r, baseX, baseY } of resourceScreenPositions) {
-        //     const sx = baseX;
-        //     const sy = baseY;
 
         // Third pass: Draw all resources with offsets
         for (const { resource: r, baseX, baseY, offsetX, offsetY } of resourceScreenPositions) {

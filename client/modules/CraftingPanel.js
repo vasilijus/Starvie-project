@@ -9,6 +9,7 @@ export default class CraftingPanel {
         this.craftingRules = null;
         this.craftQueue = []; // { recipeIndex, recipeName, timeRemaining, totalTime, result }
         this.playerRef = null; // last known player for refresh
+        this.skillSystem = null; // set externally via setSkillSystem()
 
         this.setupUI();
     }
@@ -76,6 +77,10 @@ export default class CraftingPanel {
     setRules(rules) {
         this.craftingRules = rules;
         this.renderRecipes();
+    }
+
+    setSkillSystem(skillSystem) {
+        this.skillSystem = skillSystem;
     }
 
     toggle() {
@@ -184,8 +189,14 @@ export default class CraftingPanel {
             player.inventory[k] = Math.max(0, (player.inventory[k] || 0) - v);
         }
 
+        // Apply crafting skill time reduction
+        let craftTime = r.craftTime || 2;
+        if (this.skillSystem) {
+            const reduction = this.skillSystem.getCraftTimeReduction(player);
+            craftTime = Math.max(0.5, craftTime * (1 - reduction));
+        }
+
         // add to queue (result added on completion)
-        const craftTime = r.craftTime || 2;
         this.craftQueue.push({
             recipeIndex,
             recipeName: r.name,
@@ -260,12 +271,22 @@ export default class CraftingPanel {
             const item = this.craftQueue[i];
             item.timeRemaining -= dt;
             if (item.timeRemaining <= 0) {
-                // complete: give result to playerRef if present
+                // Give result to player
                 if (this.playerRef && item.result) {
                     const name = item.result.name || item.result.type || 'item';
                     this.playerRef.inventory = this.playerRef.inventory || {};
                     this.playerRef.inventory[name] = (this.playerRef.inventory[name] || 0) + (item.result.count || 1);
                 }
+
+                // Award crafting XP
+                if (this.playerRef && this.skillSystem) {
+                    const xpReward = 25; // tunable
+                    const result = this.skillSystem.awardXp(this.playerRef, 'crafting', xpReward);
+                    if (result.leveledUp) {
+                        console.log(`Crafting skill leveled to ${result.newLevel}!`);
+                    }
+                }
+
                 this.craftQueue.splice(i, 1);
             }
         }

@@ -19,6 +19,7 @@ export class ClientPlayer {
         this.xpToNextLevel = 100;
         this.damage = 10;
         this.size = 20;
+        this.speed = 1.5;
 
         // Inventory (synced from server)
         this.inventory = {};
