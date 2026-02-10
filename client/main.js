@@ -4,12 +4,17 @@ import Network from "./modules/Network.js";
 import InputHandler from "./modules/InputHandler.js";
 import Renderer from "./modules/Renderer.js";
 import { MapEditor } from "./modules/MapEditor.js";
+import StatusPanel from "./modules/StatusPanel.js";
+// In your main game file:
+import CraftingPanel from './modules/CraftingPanel.js';
+import CraftingRules from './modules/CraftingRules.js';
+
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-
+let lastState = undefined;
 
 
 // Landing page elements
@@ -17,6 +22,7 @@ const landing = document.getElementById("landing");
 const socketIdSpan = document.getElementById("socketId");
 const playerNameInput = document.getElementById("playerName");
 const playBtn = document.getElementById("playBtn");
+
 
 // Initialize network
 const network = new Network();
@@ -31,76 +37,76 @@ network.on('connect', () => {
   playBtn.disabled = false; // Enable play button once connected
 });
 
+
 // Play button handler
 let gameStarted = false;
 playBtn.addEventListener('click', () => {
   const playerName = playerNameInput.value.trim() || `Player_${network.id.substring(0, 8)}`;
   const playerID = document.getElementById('socketId').textContent
 
-  console.log("Starting game with player name:", playerName);
-
-  // Hide landing page
   landing.classList.add('hidden');
 
-  // Initialize player with entered name
   const player = new ClientPlayer(playerID, playerName);
-
-  player.activeEffects = []; // Initialize effects array
+  player.activeEffects = [];
 
   network.on('hitEffect', (effectData) => {
-      // REMOVE THIS LINE: player.activeEffects = [] 
-      // console.log('Hit effect added at:', effectData.x, effectData.y);
-      console.log(`hitEffect: ${effectData.type}. x:${effectData.x}, y:${effectData.y}`)
-      player.activeEffects.push({
-          x: effectData.x,
-          y: effectData.y,
-          life: 1.0, 
-          decay: 0.05, // Controls how fast it vanishes
-          type: effectData.type
-      });
+    player.activeEffects.push({
+      x: effectData.x,
+      y: effectData.y,
+      life: 1.0,
+      decay: 0.05,
+      type: effectData.type
+    });
   });
 
-  // Send player name to server
   network.emit('playerJoin', { name: playerName });
 
-
-  // Initialize game components
   const worldRenderer = new WorldRenderer();
   const mapEditor = new MapEditor(canvas, ctx, player, worldRenderer, network);
 
-  const renderer = new Renderer(canvas, ctx, player, worldRenderer, mapEditor);
+  // In setup/constructor:
+  const craftingRules = new CraftingRules();
+  const craftingPanel = new CraftingPanel({ x: 250, y: 10 });
+  craftingPanel.setRules(craftingRules);
 
-  const input = new InputHandler(canvas, player, network, mapEditor);
+  const renderer = new Renderer(canvas, ctx, player, worldRenderer, mapEditor, craftingPanel);
+  const input = new InputHandler(canvas, player, network, mapEditor, craftingPanel);
 
-  console.log("Renderer initialized with player:", player);
-  console.log("InputHandler initialized with canvas", canvas);
-  
-  // Initialize world in editor (will be set once on first state update)
+  // Status panel (inventory + hotbar)
+  const statusPanel = new StatusPanel({ x: 10, y: 10, width: 220, height: 160 });
+
   let worldInitialized = false;
-    
-  // Receive authoritative state and hand to renderer
+
   network.on('state', data => {
-    const { players, enemies, worldSize, resources } = data;
-    // Initialize world once, then only update if NOT in editor mode
+    const { players } = data;
     if (!worldInitialized) {
       mapEditor.setWorld(data.world);
       worldInitialized = true;
     } else if (!mapEditor.isActive) {
-      // Only overwrite world data if not actively editing
       mapEditor.setWorld(data.world);
     }
     if (players[network.id]) {
       player.syncFromServer(players[network.id]);
     }
+
+    // store last state for input detection & rendering
+    input.lastState = data;
+    lastState = data;
+    // render immediately for lower perceived latency
     renderer.render(data);
+    // draw status panel overlay immediately
+    statusPanel.draw(ctx, player);
   });
 
-  // Game loop
   function loop() {
     player.update();
+    if (typeof lastState !== 'undefined') {
+      renderer.render(lastState);
+      statusPanel.draw(ctx, player);
+    }
     requestAnimationFrame(loop);
   }
-  gameStarted = true;
+
   loop();
 });
 
@@ -111,5 +117,3 @@ playerNameInput.addEventListener('keydown', (e) => {
     playBtn.click();
   }
 });
-
-// addEventListener()
