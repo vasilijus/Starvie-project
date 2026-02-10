@@ -1,5 +1,7 @@
 import express from "express";
 import http from "http";
+import fs from "fs";
+import path from "path";
 import { Server } from "socket.io";
 import { generateWorld, WORLD_CHUNKS, CHUNK_SIZE, TILE_SIZE, setHandmadeMap } from "./map/ProceduralMap.js";
 import { ServerPlayer } from './modules/ServerPlayer.js';
@@ -8,9 +10,15 @@ import { Wolf, Bear, EN_TYPES } from "./modules/EnemyTypes.js";
 import { ResourceFactory } from "./modules/resources/ResourceFactory.js";
 import { getHitPoint, findHitEnemy, findHitResource } from "./gameplay/TargetingSystem.js";
 import { attackEnemy } from "./gameplay/CombatSystem.js";
-import { harvestWorldResource } from "./gameplay/HarvestSystem.js";
-import fs from "fs";
-import path from "path";
+import { collectEnemyDrop, harvestWorldResource } from "./gameplay/HarvestSystem.js";
+import { applyPlayerMovement } from "./gameplay/MovementSystem.js";
+import { updateFacingDirection } from "./gameplay/PlayerStateSystem.js";
+import { updateEnemiesAI } from "./gameplay/enemy/EnemySystem.js";
+
+
+// server tick movement queue
+// This keeps everything synced and deterministic.
+const movementQueue = [];
 
 // Try to load a saved map from server/maps/map.json
 function loadMapFromFile() {
@@ -82,11 +90,6 @@ const enemies = [
 const resources = loadResourcesFromChunks();
 const enemyDrops = []; // Track drops from defeated enemies
 
-function getDistance(x1, y1, x2, y2) {
-    const dx = x1 - x2;
-    const dy = y1 - y2;
-    return Math.sqrt(dx * dx + dy * dy);
-}
 
 // Spawn enemies at random positions within the world
 for (let i = 0; i < 20; i++) {
@@ -126,6 +129,7 @@ io.on("connection", socket => {
         }
     });
 
+
     // Save map from client editor
     socket.on("saveMap", (chunksData) => {
         if (!chunksData || typeof chunksData !== 'object') {
@@ -163,86 +167,43 @@ io.on("connection", socket => {
     });
 
 
-    socket.on("playerInput", dir => {
-        const p = players[socket.id];
-        if (!p) return;
-
-        // Update player position based on input direction and speed
-        p.x += dir.x * 5;
-        p.y += dir.y * 5;
-
-        // Keep player within world bounds
-        p.x = Math.max(0, Math.min(WORLD_SIZE, p.x));
-        p.y = Math.max(0, Math.min(WORLD_SIZE, p.y));
+    // socket.on("playerInput", (dir) => {
+    //     const player = players[socket.id];
+    //     applyPlayerMovement(player, dir, WORLD_SIZE);
+    // });
+    socket.on("playerInput", (dir) => {
+        movementQueue.push({
+            id: socket.id,
+            dir
+        });
     });
 
-    socket.on('playerFacingDirection', (direction) => {
+    
+    socket.on("playerFacingDirection", (direction) => {
         const player = players[socket.id];
-        if (player && direction && direction.x !== undefined && direction.y !== undefined) {
-            player.setFacingDirection(direction);
-        }
+        updateFacingDirection(player, direction);
     });
 
-    socket.on("harvestResource", resourceId => {
+    
+    socket.on("harvestResource", (resourceId) => {
         const player = players[socket.id];
-        console.log(`[HARVEST DEBUG] Player ${player?.name} trying to harvest resource: ${resourceId}`);
-        if (!player) {
-            console.log(`[HARVEST DEBUG] Player not found for socket ${socket.id}`);
+        if (!player) return;
+
+        // Try world resource first
+        const resourceIndex = resources.findIndex(r => r.id === resourceId);
+        if (resourceIndex !== -1) {
+            harvestWorldResource(player, resources[resourceIndex]);
             return;
         }
 
-        // Find the resource (could be environment or enemy drop)
-        const resourceIndex = resources.findIndex(r => r.id === resourceId);
+        // Try enemy drop
         const dropIndex = enemyDrops.findIndex(d => d.id === resourceId);
-
-        console.log(`[HARVEST DEBUG] Searching resources (total: ${resources.length}), drops (total: ${enemyDrops.length})`);
-        console.log(`[HARVEST DEBUG] Found in resources: ${resourceIndex !== -1}, Found in drops: ${dropIndex !== -1}`);
-
-        if (resourceIndex !== -1) {
-            // Harvest from environment resource
-            const resource = resources[resourceIndex];
-            console.log(`[HARVEST DEBUG] Resource found: type=${resource.type}, canHarvest=${typeof resource.canHarvest}, isDeplete=${resource.isDeplete}`);
-
-            if (resource.canHarvest && typeof resource.canHarvest === 'function') {
-                const harvested = resource.harvestResources();
-                console.log(`[HARVEST DEBUG] Harvested result: ${JSON.stringify(harvested)}`);
-                if (harvested) {
-                    // Add to player inventory
-                    for (const [itemType, amount] of Object.entries(harvested)) {
-                        if (itemType !== 'xpReward') {
-                            player.inventory.addResource(itemType, amount);
-                            console.log(`[HARVEST DEBUG] Added ${amount} ${itemType} to inventory`);
-                        } else {
-                            player.addXP(amount);
-                            console.log(`[HARVEST DEBUG] Added ${amount} XP`);
-                        }
-                    }
-                    console.log(`${player.name} harvested: ${JSON.stringify(harvested)}`);
-                }
-            } else {
-                console.log(`[HARVEST DEBUG] Resource missing canHarvest method or not a function`);
-            }
-        } else if (dropIndex !== -1) {
-            // Collect from enemy drop
-            const drop = enemyDrops[dropIndex];
-            console.log(`[HARVEST DEBUG] Drop found: type=${drop.type}, quantity=${drop.quantity}`);
-            const collected = drop.collect();
-            console.log(`[HARVEST DEBUG] Collected: ${collected}`);
-            if (collected > 0) {
-                player.inventory.addResource(drop.type, collected);
-                player.addXP(drop.xpReward);
-                console.log(`${player.name} collected: ${collected} ${drop.type}`);
-
-                if (drop.isCollected) {
-                    enemyDrops.splice(dropIndex, 1);
-                }
-            }
-        } else {
-            console.log(`[HARVEST DEBUG] Resource ID not found in either resources or drops`);
-            console.log(`[HARVEST DEBUG] First 3 resource IDs: ${resources.slice(0, 3).map(r => r.id).join(', ')}`);
-            console.log(`[HARVEST DEBUG] First 3 drop IDs: ${enemyDrops.slice(0, 3).map(d => d.id).join(', ')}`);
+        if (dropIndex !== -1) {
+            const collected = collectEnemyDrop(player, enemyDrops[dropIndex]);
+            if (collected) enemyDrops.splice(dropIndex, 1);
         }
     });
+
 
     socket.on("playerAction", (data) => {
         const player = players[socket.id];
@@ -273,11 +234,25 @@ io.on("connection", socket => {
         }
     });
 
+
     socket.on("disconnect", () => {
         // Remove player from the game when they disconnect
         delete players[socket.id];
     });
 });
+
+
+// --------------------------------------------------
+// MOVEMENT TICK SYSTEM
+// --------------------------------------------------
+
+function processMovementQueue() {
+    while (movementQueue.length > 0) {
+        const { id, dir } = movementQueue.shift();
+        const player = players[id];
+        applyPlayerMovement(player, dir, WORLD_SIZE);
+    }
+}
 
 
 // --------------------------------------------------
@@ -403,22 +378,22 @@ function enemyAttack(enemy, player) {
     }
 }
 
-function updateEnemies(alivePlayers) {
-    if (alivePlayers.length === 0) return;
+// function updateEnemies(alivePlayers) {
+//     if (alivePlayers.length === 0) return;
 
-    for (const enemy of enemies) {
-        const { closest, bestDist } = findClosestPlayer(enemy, alivePlayers);
+//     for (const enemy of enemies) {
+//         const { closest, bestDist } = findClosestPlayer(enemy, alivePlayers);
 
-        if (closest && bestDist < HUNT_RANGE_SQ) {
-            moveEnemyTowards(enemy, closest);
-            enemyAttack(enemy, closest);
-        } else {
-            moveEnemyRandom(enemy, alivePlayers);
-        }
+//         if (closest && bestDist < HUNT_RANGE_SQ) {
+//             moveEnemyTowards(enemy, closest);
+//             enemyAttack(enemy, closest);
+//         } else {
+//             moveEnemyRandom(enemy, alivePlayers);
+//         }
 
-        clampToWorld(enemy);
-    }
-}
+//         clampToWorld(enemy);
+//     }
+// }
 
 
 // --------------------------------------------------
@@ -450,6 +425,8 @@ const TICK_RATE = 1000 / 30;
 setInterval(() => {
     const delta = TICK_RATE;
 
+    processMovementQueue();     // 🆕 movement first
+    
     // 1️⃣ Update resource respawns
     updateResources(delta);
 
@@ -460,7 +437,8 @@ setInterval(() => {
     const alivePlayers = getAlivePlayers();
 
     // 4️⃣ Run enemy AI using cached alive players
-    updateEnemies(alivePlayers);
+    // updateEnemies(alivePlayers);
+    updateEnemiesAI(enemies, alivePlayers, WORLD_SIZE);
 
     // 5️⃣ Send state to clients
     broadcastState();
@@ -473,11 +451,3 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
-
-const checkIfPlayerAlive = (person) => {
-    if (person.hp <= 0) {
-        person.isAlive = false;
-        return false;
-    }
-    return true;
-}
