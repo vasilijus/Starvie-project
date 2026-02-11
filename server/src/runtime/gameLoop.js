@@ -42,18 +42,30 @@ function cleanupDrops(state) {
   }
 }
 
-function broadcastState(io, state) {
-  const statePlayers = Object.fromEntries(
-    Object.entries(state.players).map(([id, player]) => [id, player.toClient()])
-  );
-
-  io.emit('state', {
-    players: statePlayers,
+function buildBasePayload(state) {
+  return {
+    players: Object.fromEntries(
+      Object.entries(state.players).map(([id, player]) => [id, player.toClient()])
+    ),
     enemies: state.enemies,
     world: state.world,
-    resources: state.resources.map((r) => r.toObject?.() ?? r),
-    enemyDrops: state.enemyDrops.map((drop) => drop.toObject()),
-  });
+    resources: state.resources.map((r) => r.toObject?.() ?? r)
+  };
+}
+
+function broadcastState(io, state) {
+  const basePayload = buildBasePayload(state);
+
+  for (const [socketId] of Object.entries(state.players)) {
+    const visibleDrops = state.enemyDrops
+      .filter(drop => drop.isVisibleTo?.(socketId))
+      .map(drop => drop.toObject());
+
+    io.to(socketId).emit('state', {
+      ...basePayload,
+      enemyDrops: visibleDrops
+    });
+  }
 }
 
 export function startGameLoop(io, state) {

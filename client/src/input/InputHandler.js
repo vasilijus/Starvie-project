@@ -20,7 +20,10 @@ export default class InputHandler {
 
         window.addEventListener('keydown', e => this.keys[e.key] = true);
         window.addEventListener('keyup', e => this.keys[e.key] = false);
-        window.addEventListener('click', e => this.handleClick(e));
+        // Use mousedown so left/right actions are distinguishable.
+        // `click` always reports primary button, which made interact logic unreachable.
+        window.addEventListener('mousedown', e => this.handlePointerAction(e));
+        window.addEventListener('contextmenu', e => e.preventDefault());
         window.addEventListener('mousemove', e => this.handleMouseMove(e));
 
         this.startSendLoop();
@@ -95,7 +98,57 @@ export default class InputHandler {
         send();
     }
 
-    handleClick(e) {
+    getWorldClick(e) {
+        return {
+            x: this.player.x - this.canvas.width / 2 + e.clientX,
+            y: this.player.y - this.canvas.height / 2 + e.clientY
+        };
+    }
+
+    findClosestTarget(items, clickX, clickY, maxClickRange) {
+        if (!Array.isArray(items) || items.length === 0) return null;
+
+        let closest = null;
+        let closestDist = maxClickRange;
+
+        for (const item of items) {
+            const dist = Math.hypot(clickX - item.x, clickY - item.y);
+            if (dist < closestDist) {
+                closest = item;
+                closestDist = dist;
+            }
+        }
+
+        return closest;
+    }
+
+    resolveClickTarget(clickX, clickY) {
+        const state = this.lastState || {};
+        const maxClickRange = 40;
+
+        // OSRS style priority: loot on ground > skilling resource > mob
+        const dropTarget = this.findClosestTarget(state.enemyDrops, clickX, clickY, maxClickRange);
+        if (dropTarget) return { kind: 'drop', entity: dropTarget };
+
+        const resourceTarget = this.findClosestTarget(state.resources, clickX, clickY, maxClickRange);
+        if (resourceTarget) return { kind: 'resource', entity: resourceTarget };
+
+        const enemyTarget = this.findClosestTarget(state.enemies, clickX, clickY, maxClickRange);
+        if (enemyTarget) return { kind: 'enemy', entity: enemyTarget };
+
+        return null;
+    }
+
+    canAttack() {
+        const now = Date.now();
+        const attackDelay = 2000 / this.player.attackSpeed;
+        if (now - this.player.lastAttackTime < attackDelay) return false;
+
+        this.player.lastAttackTime = now;
+        return true;
+    }
+
+    handlePointerAction(e) {
         // Check for craft button clicks first (if panel is open)
         if (this.craftingPanel && this.craftingPanel.isOpen) {
             console.log('Crafting panel is open, checking for clicks...');
@@ -127,22 +180,12 @@ export default class InputHandler {
         }
 
         const isLeftClick = e && typeof e.button === 'number' && e.button === 0;
+        const isRightClick = e && typeof e.button === 'number' && e.button === 2;
+
+        if (!isLeftClick && !isRightClick) return;
+
         const equipment = this.player.equipment || 'none';
-        const isMeleeEquipped = (equipment === 'sword' || equipment === 'axe');
-        const type = (isMeleeEquipped || isLeftClick) ? 'attack' : 'interact';
-
-        if (type === 'attack') {
-            const now = Date.now();
-            const attackDelay = 2000 / this.player.attackSpeed;
-            if (now - this.player.lastAttackTime < attackDelay) {
-                // on cooldown
-                return;
-            }
-            this.player.lastAttackTime = now;
-        }
-
-        const clickX = this.player.x - this.canvas.width / 2 + e.clientX;
-        const clickY = this.player.y - this.canvas.height / 2 + e.clientY;
+        const { x: clickX, y: clickY } = this.getWorldClick(e);
         const dx = clickX - this.player.x;
         const dy = clickY - this.player.y;
         const len = Math.hypot(dx, dy);
@@ -151,48 +194,29 @@ export default class InputHandler {
         const norm = { x: dx / len, y: dy / len };
         this.player.facingDirection = norm;
 
-        if (type === 'attack') {
-            try {
-                this.player.startAttack(norm); 
-            } catch (err) { }
-            
-        } else {
-            // If not attacking, it's an interaction (e.g., right-click)
-            try {
+        const target = this.resolveClickTarget(clickX, clickY);
 
-                // this.player.startInteract(norm);
-                
-                // Try to detect clicking on resources or drops using the last server state
-                const state = this.lastState || {};
-                const maxClickRange = 40;
-
-                if (state.resources && Array.isArray(state.resources)) {
-                    for (const resource of state.resources) {
-                        const dist = Math.hypot(clickX - resource.x, clickY - resource.y);
-                        if (dist < maxClickRange) {
-                            // Hit an environment resource
-                            this.network.emit('harvestResource', resource.id);
-                            return; // don't send playerAction
-                        }
-                    }
-                }
-
-                if (state.enemyDrops && Array.isArray(state.enemyDrops)) {
-                    for (const drop of state.enemyDrops) {
-                        const dist = Math.hypot(clickX - drop.x, clickY - drop.y);
-                        if (dist < maxClickRange) {
-                            // Hit an enemy drop
-                            this.network.emit('harvestResource', drop.id);
-                            return;
-                        }
-                    }
-                }
-
-            } catch (err) { }
+        if (target?.kind === 'drop' || target?.kind === 'resource') {
+            this.network.emit('harvestResource', target.entity.id);
+            return;
         }
 
+        // Right-click forces interaction; left-click follows context-sensitive default.
+        const shouldAttack = (target?.kind === 'enemy') || (isLeftClick && !target);
 
-        // fallback: send a generic playerAction
-        this.network.emit('playerAction', { type, direction: norm, item: equipment, targetResourceId: null });
+        if (shouldAttack) {
+            if (!this.canAttack()) return;
+            this.player.startAttack(norm);
+            this.network.emit('playerAction', { type: 'attack', direction: norm, item: equipment, targetResourceId: null });
+            return;
+        }
+
+        if (isRightClick) {
+            this.network.emit('playerAction', { type: 'interact', direction: norm, item: equipment, targetResourceId: null });
+            return;
+        }
+
+        // Safe fallback: keep server-side direction-based interactions alive.
+        this.network.emit('playerAction', { type: 'interact', direction: norm, item: equipment, targetResourceId: null });
     }
 }

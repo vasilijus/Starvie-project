@@ -18,8 +18,8 @@ export class Wolf extends Enemy {
      * Get resource drops when defeated
      * @returns {array} Array of EnemyResource instances
      */
-    getResourceDrops() {
-        return generateEnemyDrops(this.enemyType, this.x, this.y);
+    getResourceDrops(ownerId) {
+        return generateEnemyDrops(this.enemyType, this.x, this.y, ownerId);
     }
 }
 
@@ -38,7 +38,7 @@ export class Bear extends Enemy {
      * Get resource drops when defeated
      * @returns {array} Array of EnemyResource instances
      */
-    getResourceDrops() {
-        return generateEnemyDrops(this.enemyType, this.x, this.y);
+    getResourceDrops(ownerId) {
+        return generateEnemyDrops(this.enemyType, this.x, this.y, ownerId);
     }
 }
