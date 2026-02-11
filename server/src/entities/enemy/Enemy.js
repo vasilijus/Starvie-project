@@ -1,4 +1,4 @@
-import { generateGUID } from "../util/GUID.js";
+import { generateGUID } from "../../utils/GUID.js";
 export class Enemy {
     constructor(x, y) {
         this.x = x;

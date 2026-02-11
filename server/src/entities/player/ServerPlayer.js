@@ -1,7 +1,7 @@
-import { PlayerStats } from './core/PlayerStats.js';
-import { PlayerInventory } from './core/PlayerInventory.js';
-import { PlayerExperience } from './core/PlayerExperience.js';
-import { PlayerHealth } from './core/PlayerHealth.js';
+import { PlayerStats } from './PlayerStats.js';
+import { PlayerInventory } from './PlayerInventory.js';
+import { PlayerExperience } from './PlayerExperience.js';
+import { PlayerHealth } from './PlayerHealth.js';
 
 /**
  * ServerPlayer - Server-authoritative player with all game logic
