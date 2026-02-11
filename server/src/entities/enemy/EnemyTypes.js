@@ -1,5 +1,5 @@
 import { Enemy } from "./Enemy.js";
-import { generateEnemyDrops } from "./resources/EnemyResource.js";
+import { generateEnemyDrops } from "../resource/EnemyResource.js";
 
 export const EN_TYPES = 2;
 

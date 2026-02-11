@@ -1,13 +1,13 @@
-import { ClientPlayer } from "./modules/ClientPlayer.js";
-import { WorldRenderer } from "./modules/WorldRenderer.js";
-import Network from "./modules/Network.js";
-import InputHandler from "./modules/InputHandler.js";
-import Renderer from "./modules/Renderer.js";
-import { MapEditor } from "./modules/MapEditor.js";
-import StatusPanel from "./modules/StatusPanel.js";
+import { ClientPlayer } from './entities/ClientPlayer.js';
+import { WorldRenderer } from './rendering/WorldRenderer.js';
+import Network from './network/Network.js';
+import InputHandler from './input/InputHandler.js';
+import Renderer from './rendering/Renderer.js';
+import { MapEditor } from './ui/editor/MapEditor.js';
+import StatusPanel from './ui/panels/StatusPanel.js';
 // In your main game file:
-import CraftingPanel from './modules/CraftingPanel.js';
-import CraftingRules from './modules/CraftingRules.js';
+import CraftingPanel from './ui/panels/CraftingPanel.js';
+import CraftingRules from './systems/CraftingRules.js';
 
 
 const canvas = document.getElementById("game");
