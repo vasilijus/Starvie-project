@@ -9,7 +9,7 @@ export function attackEnemy(player, enemy, enemyDrops) {
     if (enemy.hp > 0) return { killed: false };
 
     // Enemy died
-    const drops = enemy.getResourceDrops();
+    const drops = enemy.getResourceDrops(player.id);
     enemyDrops.push(...drops);
 
     player.addXP(enemy.xpWorth);

@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, TILE_SIZE, WORLD_CHUNKS } from './WorldRenderer.js';
+import { CHUNK_SIZE, TILE_SIZE, WORLD_CHUNKS } from '../../rendering/WorldRenderer.js';
 
 const TILE_COLORS = {
     "snow": "#FFFFF0",

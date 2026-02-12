@@ -6,7 +6,7 @@ import {
   GemResource, IceResource, CrystalResource
 } from './EnvironmentResource.js';
 
-import { generateGUID } from '../../util/GUID.js';
+import { generateGUID } from '../../utils/GUID.js';
 
 /**
  * ResourceFactory
