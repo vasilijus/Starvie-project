@@ -19,7 +19,7 @@ function findClosestPlayer(enemy, players) {
     return {closest, best};
 }
 
-export function updateEnemiesAI(enemies, alivePlayers, worldSize) {
+export function updateEnemiesAI(enemies, alivePlayers, worldSize, resources = []) {
     if (alivePlayers.length === 0) return;
 
     for (const enemy of enemies) {
@@ -35,11 +35,11 @@ export function updateEnemiesAI(enemies, alivePlayers, worldSize) {
         // 2️⃣ Execute behaviour
         switch (enemy.state) {
             case EnemyState.IDLE:
-                wander(enemy, alivePlayers);
+                wander(enemy, alivePlayers, resources);
                 break;
 
             case EnemyState.CHASE:
-                chase(enemy, closest);
+                chase(enemy, closest, resources);
                 break;
 
             case EnemyState.ATTACK:

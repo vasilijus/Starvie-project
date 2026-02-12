@@ -77,7 +77,7 @@ export function startGameLoop(io, state) {
     cleanupDrops(state);
 
     const alivePlayers = getAlivePlayers(state);
-    updateEnemiesAI(state.enemies, alivePlayers, state.worldSize);
+    updateEnemiesAI(state.enemies, alivePlayers, state.worldSize, state.resources);
 
     broadcastState(io, state);
   }, TICK_RATE);
