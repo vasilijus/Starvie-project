@@ -121,16 +121,16 @@ export default class Renderer {
             const sx = baseX + offsetX;
             const sy = baseY + offsetY;
 
-            // Draw resource with icon color
             const color = r.icon_color || '#00AA00';
-            ctx.fillStyle = color;
-            ctx.fillRect(sx - 5, sy - 5, 10, 10);
+            const renderRadius = r.renderRadius || r.size || 10;
+
+            this.drawResourceShape(ctx, r, sx, sy, color, renderRadius);
 
             // Draw resource type label (small text above resource)
             ctx.fillStyle = color;
             ctx.font = '10px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(r.type || 'resource', sx, sy - 12);
+            ctx.fillText(r.type || 'resource', sx, sy - (renderRadius + 6));
 
             // Draw HP indicator if damaged
             if (r.hp !== undefined && r.hpMax !== undefined && r.hp < r.hpMax) {
@@ -224,6 +224,41 @@ export default class Renderer {
                 ctx.fillText(`x${d.quantity}`, sx + 8, sy + 8);
             }
         }
+    }
+
+
+    drawResourceShape(ctx, resource, x, y, color, radius) {
+        const type = resource.type || 'resource';
+
+        if (type === 'tree') {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#6b3e1d';
+            const trunkW = Math.max(4, radius * 0.4);
+            const trunkH = Math.max(6, radius * 0.7);
+            ctx.fillRect(x - trunkW / 2, y + radius * 0.25, trunkW, trunkH);
+            return;
+        }
+
+        if (type === 'stone') {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#5e5e5e';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            return;
+        }
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(5, radius * 0.6), 0, Math.PI * 2);
+        ctx.fill();
     }
 
     drawHealth(ctx, x, y, hp = 100) {

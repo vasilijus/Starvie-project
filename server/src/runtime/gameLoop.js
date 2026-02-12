@@ -7,7 +7,7 @@ function processMovementQueue(state) {
   while (state.movementQueue.length > 0) {
     const { id, dir } = state.movementQueue.shift();
     const player = state.players[id];
-    applyPlayerMovement(player, dir, state.worldSize);
+    applyPlayerMovement(player, dir, state.worldSize, state.resources);
   }
 }
 

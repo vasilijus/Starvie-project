@@ -15,7 +15,10 @@ export class Tree extends Resource {
             icon_color: '#2d5016',
             size: 24,
             hp: 100,
-            hpMax: 100
+            hpMax: 100,
+            renderRadius: 20,
+            collisionRadius: 10,
+            isSolid: true
         });
 
         this.resourceYield = {
@@ -58,7 +61,10 @@ export class BerryBush extends Resource {
             icon_color: '#8b2f39',
             size: 14,
             hp: 50,
-            hpMax: 50
+            hpMax: 50,
+            renderRadius: 14,
+            collisionRadius: 0,
+            isSolid: false
         });
 
         this.resourceYield = {
@@ -101,7 +107,10 @@ export class StoneResource extends Resource {
             icon_color: '#7a7a7a',
             size: 16,
             hp: 150, // Harder to break
-            hpMax: 150
+            hpMax: 150,
+            renderRadius: 15,
+            collisionRadius: 15,
+            isSolid: true
         });
 
         this.resourceYield = {
@@ -144,7 +153,10 @@ export class GrassResource extends Resource {
             icon_color: '#6b8e23',
             size: 12,
             hp: 30,
-            hpMax: 30
+            hpMax: 30,
+            renderRadius: 12,
+            collisionRadius: 0,
+            isSolid: false
         });
 
         this.resourceYield = {
