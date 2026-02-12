@@ -1,10 +1,11 @@
 /**
  * EnemyResource
- * Represents a harvestable drop from a defeated enemy
- * These are temporary and don't respawn
+ * Represents a harvestable drop from a defeated enemy.
+ * Drops are private to the killer for a short period, then become public,
+ * and eventually despawn (old-school MMO style).
  */
 export class EnemyResource {
-    constructor(id, type, x, y, quantity, xpReward = 0) {
+    constructor(id, type, x, y, quantity, xpReward = 0, ownerId = null) {
         this.id = id;
         this.type = type;
         this.x = x;
@@ -13,6 +14,8 @@ export class EnemyResource {
         this.maxQuantity = quantity;
         this.xpReward = xpReward;
 
+        this.ownerId = ownerId;
+
         // Visual
         this.icon_color = this.getColorForType(type);
         this.size = 12;
@@ -20,14 +23,13 @@ export class EnemyResource {
         // Lifecycle
         this.isCollected = false;
         this.createdTime = Date.now();
-        this.despawnTime = 120000; // 2 minutes before despawning
+
+        // OSRS-like visibility windows
+        this.ownerVisibilityMs = 60000; // 60s private
+        this.publicVisibilityMs = 60000; // then 60s public
+        this.despawnTime = this.ownerVisibilityMs + this.publicVisibilityMs;
     }
 
-    /**
-     * Get color based on resource type
-     * @param {string} type
-     * @returns {string} Hex color
-     */
     getColorForType(type) {
         const colors = {
             meat: '#d32f2f',
@@ -40,11 +42,27 @@ export class EnemyResource {
         return colors[type] || '#999999';
     }
 
-    /**
-     * Collect this drop
-     * @param {number} amount - Amount to collect
-     * @returns {number} Actual amount collected
-     */
+    getAgeMs() {
+        return Date.now() - this.createdTime;
+    }
+
+    isVisibleTo(playerId) {
+        if (this.isCollected) return false;
+
+        const age = this.getAgeMs();
+        if (age >= this.despawnTime) return false;
+
+        if (age < this.ownerVisibilityMs) {
+            return !this.ownerId || this.ownerId === playerId;
+        }
+
+        return true;
+    }
+
+    canCollect(playerId) {
+        return this.isVisibleTo(playerId);
+    }
+
     collect(amount = this.quantity) {
         if (this.isCollected) return 0;
 
@@ -58,19 +76,10 @@ export class EnemyResource {
         return collected;
     }
 
-    /**
-     * Check if this drop should despawn
-     * @returns {boolean}
-     */
     shouldDespawn() {
-        const age = Date.now() - this.createdTime;
-        return age > this.despawnTime || this.isCollected;
+        return this.getAgeMs() > this.despawnTime || this.isCollected;
     }
 
-    /**
-     * Serialize for sending to client
-     * @returns {object}
-     */
     toObject() {
         return {
             id: this.id,
@@ -88,64 +97,73 @@ export class EnemyResource {
 }
 
 /**
- * EnemyResourceTable
- * Defines what drops each enemy type provides
+ * Loot tables split into guaranteed and random rolls.
  */
-export const ENEMY_RESOURCES = {
-    wolf: [
-        { type: 'meat', min: 2, max: 4, chance: 0.9, xpReward: 10 },
-        { type: 'fur', min: 1, max: 2, chance: 0.7, xpReward: 8 },
-        { type: 'bone', min: 1, max: 1, chance: 0.3, xpReward: 5 }
-    ],
-    bear: [
-        { type: 'meat', min: 4, max: 6, chance: 0.95, xpReward: 20 },
-        { type: 'fur', min: 2, max: 3, chance: 0.8, xpReward: 15 },
-        { type: 'bone', min: 2, max: 2, chance: 0.5, xpReward: 10 },
-        { type: 'tooth', min: 1, max: 2, chance: 0.4, xpReward: 12 }
-    ]
+export const ENEMY_LOOT_TABLES = {
+    wolf: {
+        guaranteed: [
+            { type: 'bone', min: 1, max: 1, xpReward: 5 }
+        ],
+        rolls: [
+            { type: 'meat', min: 2, max: 4, chance: 0.9, xpReward: 10 },
+            { type: 'fur', min: 1, max: 2, chance: 0.7, xpReward: 8 }
+        ]
+    },
+    bear: {
+        guaranteed: [
+            { type: 'bone', min: 2, max: 2, xpReward: 10 }
+        ],
+        rolls: [
+            { type: 'meat', min: 4, max: 6, chance: 0.95, xpReward: 20 },
+            { type: 'fur', min: 2, max: 3, chance: 0.8, xpReward: 15 },
+            { type: 'tooth', min: 1, max: 2, chance: 0.4, xpReward: 12 }
+        ]
+    }
 };
 
-/**
- * Get resource drops for an enemy type
- * @param {string} enemyType - Type of enemy (wolf, bear, etc)
- * @param {number} baseX - X position to drop at
- * @param {number} baseY - Y position to drop at
- * @returns {array} Array of EnemyResource instances
- */
-export function generateEnemyDrops(enemyType, baseX, baseY) {
-    const drops = [];
-    const resourceTable = ENEMY_RESOURCES[enemyType.toLowerCase()];
+function randomQty(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) + min);
+}
 
-    if (!resourceTable) {
-        console.warn(`No resource table for enemy type: ${enemyType}`);
+function makeDropId(enemyType, dropIndex) {
+    return `drop_${enemyType}_${Date.now()}_${dropIndex}_${Math.floor(Math.random() * 10000)}`;
+}
+
+/**
+ * Get resource drops for an enemy type using loot table rolls.
+ */
+export function generateEnemyDrops(enemyType, baseX, baseY, ownerId = null) {
+    const drops = [];
+    const table = ENEMY_LOOT_TABLES[enemyType.toLowerCase()];
+
+    if (!table) {
+        console.warn(`No loot table for enemy type: ${enemyType}`);
         return drops;
     }
 
     let dropIndex = 0;
-    for (const resource of resourceTable) {
-        // Check if this resource type should drop
-        if (Math.random() > resource.chance) continue;
+    const allEntries = [
+        ...(table.guaranteed || []).map(entry => ({ ...entry, chance: 1 })),
+        ...(table.rolls || [])
+    ];
 
-        // Generate quantity
-        const quantity = Math.floor(
-            Math.random() * (resource.max - resource.min + 1) + resource.min
-        );
+    for (const entry of allEntries) {
+        if (Math.random() > (entry.chance ?? 1)) continue;
 
-        // Spread drops slightly so they're not all in same location
-        const offset = dropIndex * 10;
+        const quantity = randomQty(entry.min, entry.max);
         const dropX = baseX + (Math.random() * 20 - 10);
         const dropY = baseY + (Math.random() * 20 - 10);
 
-        const drop = new EnemyResource(
-            `drop_${enemyType}_${dropIndex}`,
-            resource.type,
+        drops.push(new EnemyResource(
+            makeDropId(enemyType, dropIndex),
+            entry.type,
             dropX,
             dropY,
             quantity,
-            resource.xpReward
-        );
+            entry.xpReward,
+            ownerId
+        ));
 
-        drops.push(drop);
         dropIndex++;
     }
 

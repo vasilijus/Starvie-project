@@ -67,7 +67,10 @@ export function registerSocketHandlers(io, state) {
 
       const dropIndex = state.enemyDrops.findIndex((d) => d.id === resourceId);
       if (dropIndex !== -1) {
-        const collected = collectEnemyDrop(player, state.enemyDrops[dropIndex]);
+        const drop = state.enemyDrops[dropIndex];
+        if (!drop.canCollect?.(player.id)) return;
+
+        const collected = collectEnemyDrop(player, drop);
         if (collected) state.enemyDrops.splice(dropIndex, 1);
       }
     });
