@@ -205,6 +205,8 @@ export default class InputHandler {
         const shouldAttack = (target?.kind === 'enemy') || (isLeftClick && !target);
 
         if (shouldAttack) {
+            console.log('InputHandler')
+            console.log(this.player)
             if (!this.canAttack()) return;
             this.player.startAttack(norm);
             this.network.emit('playerAction', { type: 'attack', direction: norm, item: equipment, targetResourceId: null });
