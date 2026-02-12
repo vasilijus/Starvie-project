@@ -1,3 +1,6 @@
+import { drawEnemy } from './drawers/enemyDrawer.js';
+import { drawResource } from './drawers/resourceDrawer.js';
+
 export default class Renderer {
     constructor(canvas, ctx, player, worldRenderer, mapEditor = null) {
         this.canvas = canvas;
@@ -61,9 +64,7 @@ export default class Renderer {
         for (const enemy of enemies) {
             const sx = enemy.x - px + this.canvas.width / 2;
             const sy = enemy.y - py + this.canvas.height / 2;
-            // ctx.fillStyle = 'grey';
-            ctx.fillStyle = enemy.color;
-            ctx.fillRect(sx, sy, enemy.size, enemy.size);
+            drawEnemy(ctx, enemy, sx, sy);
             if (enemy.hp < enemy.hpMax)
                 this.drawHealth(ctx, sx, sy, enemy.hp);
         }
@@ -121,10 +122,7 @@ export default class Renderer {
             const sx = baseX + offsetX;
             const sy = baseY + offsetY;
 
-            const color = r.icon_color || '#00AA00';
-            const renderRadius = r.renderRadius || r.size || 10;
-
-            this.drawResourceShape(ctx, r, sx, sy, color, renderRadius);
+            const { color, renderRadius } = drawResource(ctx, r, sx, sy);
 
             // Draw resource type label (small text above resource)
             ctx.fillStyle = color;
@@ -226,40 +224,6 @@ export default class Renderer {
         }
     }
 
-
-    drawResourceShape(ctx, resource, x, y, color, radius) {
-        const type = resource.type || 'resource';
-
-        if (type === 'tree') {
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = '#6b3e1d';
-            const trunkW = Math.max(4, radius * 0.4);
-            const trunkH = Math.max(6, radius * 0.7);
-            ctx.fillRect(x - trunkW / 2, y + radius * 0.25, trunkW, trunkH);
-            return;
-        }
-
-        if (type === 'stone') {
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = '#5e5e5e';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            return;
-        }
-
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(x, y, Math.max(5, radius * 0.6), 0, Math.PI * 2);
-        ctx.fill();
-    }
 
     drawHealth(ctx, x, y, hp = 100) {
         // 1. Logic for Bar Color (Fixed Order)

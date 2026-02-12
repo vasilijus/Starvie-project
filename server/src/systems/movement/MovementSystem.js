@@ -1,3 +1,5 @@
+import { applyAxisSeparatedMovement } from '../collision/SolidResourceCollision.js';
+
 // --------------------------------------------------
 // PLAYER MOVEMENT SYSTEM (Server Authoritative)
 // --------------------------------------------------
@@ -31,18 +33,11 @@ export function applyPlayerMovement(player, inputDir, worldSize, resources = [])
     const speed = getPlayerSpeed(player);
 
     // 3️⃣ Calculate candidate position
-    const previousX = player.x;
-    const previousY = player.y;
-    const nextX = previousX + dir.x * speed;
-    const nextY = previousY + dir.y * speed;
+    const nextX = player.x + dir.x * speed;
+    const nextY = player.y + dir.y * speed;
 
     // 4️⃣ Apply movement with axis-separate collision for simple sliding
-    player.x = nextX;
-    player.y = previousY;
-    if (isCollidingWithSolidResource(player, resources)) player.x = previousX;
-
-    player.y = nextY;
-    if (isCollidingWithSolidResource(player, resources)) player.y = previousY;
+    applyAxisSeparatedMovement(player, nextX, nextY, resources);
 
     // 5️⃣ Keep player inside world bounds
     clampPlayerToWorld(player, worldSize);
@@ -63,26 +58,4 @@ function getPlayerSpeed(player) {
 function clampPlayerToWorld(player, worldSize) {
     player.x = clamp(player.x, WORLD_PADDING, worldSize);
     player.y = clamp(player.y, WORLD_PADDING, worldSize);
-}
-
-
-function isCollidingWithSolidResource(player, resources) {
-    const playerRadius = Math.max(2, (player.size || 20) / 2);
-
-    for (const resource of resources) {
-        if (!resource?.isSolid) continue;
-
-        const collisionRadius = Math.max(0, resource.collisionRadius || 0);
-        if (collisionRadius <= 0) continue;
-
-        const dx = player.x - resource.x;
-        const dy = player.y - resource.y;
-        const minDistance = playerRadius + collisionRadius;
-
-        if ((dx * dx + dy * dy) < (minDistance * minDistance)) {
-            return true;
-        }
-    }
-
-    return false;
 }
