@@ -23,6 +23,11 @@ export class Resource {
         // Visual
         this.icon_color = options.icon_color || '#fff';
         this.size = options.size || 10;
+        this.renderRadius = options.renderRadius ?? this.size;
+
+        // Collision / interaction metadata
+        this.isSolid = options.isSolid ?? false;
+        this.collisionRadius = options.collisionRadius ?? this.renderRadius;
 
         // HP system for durability (if applicable)
         this.hp = options.hp || 100;
@@ -121,6 +126,9 @@ export class Resource {
             isDeplete: this.isDeplete,
             icon_color: this.icon_color,
             size: this.size,
+            renderRadius: this.renderRadius,
+            isSolid: this.isSolid,
+            collisionRadius: this.collisionRadius,
             hp: this.hp,
             hpMax: this.hpMax,
             respawnProgress: this.getRespawnProgress(),

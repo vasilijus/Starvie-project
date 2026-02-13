@@ -15,7 +15,10 @@ export class Tree extends Resource {
             icon_color: '#2d5016',
             size: 24,
             hp: 100,
-            hpMax: 100
+            hpMax: 100,
+            renderRadius: 20,
+            collisionRadius: 10,
+            isSolid: true
         });
 
         this.resourceYield = {
@@ -56,9 +59,12 @@ export class BerryBush extends Resource {
             respawnTime: 20000, // 20 seconds to fully regrow (faster than tree)
             respawnRate: 0.15,
             icon_color: '#8b2f39',
-            size: 14,
+            size: 6,
             hp: 50,
-            hpMax: 50
+            hpMax: 50,
+            renderRadius: 6,
+            collisionRadius: 0,
+            isSolid: false
         });
 
         this.resourceYield = {
@@ -99,9 +105,12 @@ export class StoneResource extends Resource {
             respawnTime: 60000, // 60 seconds (slowest)
             respawnRate: 0.05,
             icon_color: '#7a7a7a',
-            size: 16,
+            size: 12,
             hp: 150, // Harder to break
-            hpMax: 150
+            hpMax: 150,
+            renderRadius: 15,
+            collisionRadius: 15,
+            isSolid: true
         });
 
         this.resourceYield = {
@@ -144,7 +153,10 @@ export class GrassResource extends Resource {
             icon_color: '#6b8e23',
             size: 12,
             hp: 30,
-            hpMax: 30
+            hpMax: 30,
+            renderRadius: 12,
+            collisionRadius: 0,
+            isSolid: false
         });
 
         this.resourceYield = {
@@ -344,8 +356,26 @@ export class RockResource extends Resource {
             icon_color: '#808080',
             size: 14,
             hp: 160,
-            hpMax: 160
+            hpMax: 160,
+            renderRadius: 10,
+            collisionRadius: 10,
+            isSolid: true
         });
+
+        /*
+            quantity: 5,
+            maxQuantity: 5,
+            respawnEnabled: true,
+            respawnTime: 45000, // 45 seconds to fully regrow
+            respawnRate: 0.1,
+            icon_color: '#2d5016',
+            size: 24,
+            hp: 100,
+            hpMax: 100,
+            renderRadius: 20,
+            collisionRadius: 10,
+            isSolid: true
+        */
 
         this.resourceYield = {
             rock: { min: 2, max: 4 }
@@ -495,7 +525,7 @@ export class GemResource extends Resource {
             respawnTime: 90000, // 90 seconds (very slow)
             respawnRate: 0.02,
             icon_color: '#8B008B',
-            size: 11,
+            size: 3,
             hp: 250,
             hpMax: 250
         });

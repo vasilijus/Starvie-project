@@ -1,3 +1,6 @@
+import { drawEnemy } from './drawers/enemyDrawer.js';
+import { drawResource } from './drawers/resourceDrawer.js';
+
 export default class Renderer {
     constructor(canvas, ctx, player, worldRenderer, mapEditor = null) {
         this.canvas = canvas;
@@ -61,9 +64,7 @@ export default class Renderer {
         for (const enemy of enemies) {
             const sx = enemy.x - px + this.canvas.width / 2;
             const sy = enemy.y - py + this.canvas.height / 2;
-            // ctx.fillStyle = 'grey';
-            ctx.fillStyle = enemy.color;
-            ctx.fillRect(sx, sy, enemy.size, enemy.size);
+            drawEnemy(ctx, enemy, sx, sy);
             if (enemy.hp < enemy.hpMax)
                 this.drawHealth(ctx, sx, sy, enemy.hp);
         }
@@ -121,16 +122,13 @@ export default class Renderer {
             const sx = baseX + offsetX;
             const sy = baseY + offsetY;
 
-            // Draw resource with icon color
-            const color = r.icon_color || '#00AA00';
-            ctx.fillStyle = color;
-            ctx.fillRect(sx - 5, sy - 5, 10, 10);
+            const { color, renderRadius } = drawResource(ctx, r, sx, sy);
 
             // Draw resource type label (small text above resource)
             ctx.fillStyle = color;
             ctx.font = '10px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(r.type || 'resource', sx, sy - 12);
+            ctx.fillText(r.type || 'resource', sx, sy - (renderRadius + 6));
 
             // Draw HP indicator if damaged
             if (r.hp !== undefined && r.hpMax !== undefined && r.hp < r.hpMax) {
@@ -225,6 +223,7 @@ export default class Renderer {
             }
         }
     }
+
 
     drawHealth(ctx, x, y, hp = 100) {
         // 1. Logic for Bar Color (Fixed Order)

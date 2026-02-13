@@ -1,3 +1,5 @@
+import { applyAxisSeparatedMovement } from '../collision/SolidResourceCollision.js';
+
 // --------------------------------------------------
 // PLAYER MOVEMENT SYSTEM (Server Authoritative)
 // --------------------------------------------------
@@ -21,7 +23,7 @@ function normalizeDirection(dir) {
 }
 
 // Main movement entry point used by sockets
-export function applyPlayerMovement(player, inputDir, worldSize) {
+export function applyPlayerMovement(player, inputDir, worldSize, resources = []) {
     if (!player?.isAlive) return;
 
     // 1️⃣ Normalize input (prevents speed hacks)
@@ -30,11 +32,14 @@ export function applyPlayerMovement(player, inputDir, worldSize) {
     // 2️⃣ Calculate final speed (future buffs/debuffs hook here)
     const speed = getPlayerSpeed(player);
 
-    // 3️⃣ Apply movement
-    player.x += dir.x * speed;
-    player.y += dir.y * speed;
+    // 3️⃣ Calculate candidate position
+    const nextX = player.x + dir.x * speed;
+    const nextY = player.y + dir.y * speed;
 
-    // 4️⃣ Keep player inside world bounds
+    // 4️⃣ Apply movement with axis-separate collision for simple sliding
+    applyAxisSeparatedMovement(player, nextX, nextY, resources);
+
+    // 5️⃣ Keep player inside world bounds
     clampPlayerToWorld(player, worldSize);
 }
 
