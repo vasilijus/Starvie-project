@@ -362,3 +362,24 @@ Or review the source code - it's well-commented!
 
 **Last Updated:** February 2026
 **Status:** ✅ Complete and tested
+
+
+---
+
+## 🔄 Recent Gameplay/Systems Updates
+
+### Resources
+- Added `gold` and `grain` resources across factory/world generation.
+- Added a dynamic **Resource Visual Editor** (`/resource-editor.html`) that reads resource types from JS definitions.
+- Moved resource visual metadata into `client/src/rendering/definitions/resourceVisualDefinitions.js` for a single source of truth.
+
+### Collision
+- Solid resources are rendered at true world coordinates (no visual spreading offsets).
+- Server collision now supports collision center offsets (`collisionOffsetX`, `collisionOffsetY`) and reduced effective radius for tighter feel.
+- Player/resource collision checks now use corrected center-based math for better left/right consistency.
+
+### Enemies
+- New enemy types: **hyena** and **rabbit**.
+- New AI state: **FLEE** for passive mobs.
+- Wolf gets low-player-health chase boost.
+- Bear has stronger hit + larger perception range.

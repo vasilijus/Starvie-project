@@ -218,3 +218,28 @@ See these files for more information:
 - `ARCHITECTURE.md` - Visual diagrams and data flow
 - `REFACTORING_NOTES.md` - Detailed explanation
 - `MIGRATION_GUIDE.js` - Step-by-step migration
+
+
+---
+
+## ✅ Additional Work Completed After Original Refactor
+
+### Resources
+- Added new resource types: `gold`, `grain`.
+- Added centralized visual definitions and improved resource silhouettes.
+- Added dynamic resource editor page (`client/resource-editor.html`).
+
+### Collision Fidelity
+- Solid resources are no longer visually displaced by overlap spreading.
+- Collision checks now support offset hit centers and radius tuning.
+- Player collision center usage corrected for directional consistency.
+
+### Enemy Systems
+- Added `hyena` and `rabbit` mobs.
+- Added passive `FLEE` AI state and per-enemy trait overrides.
+- Added wolf low-health-target speed boost.
+- Added bear stronger attack + larger sensing radius.
+
+### Loot/Spawn Coverage
+- Added loot tables for hyena/rabbit.
+- Enemy spawn pool now includes wolf, bear, hyena, rabbit.

@@ -36,3 +36,21 @@ If you want I can:
 - Commit these changes directly into the repo (if you enable file editing for me).
 
 Which next step do you want me to do now?
+
+---
+
+## Latest Resource System Notes
+
+### New Resource Types
+- `gold`: rare, high-value resource.
+- `grain`: common food/crafting ingredient.
+
+### Resource Rendering & Authoring
+- Resource shape/style is now driven by `resourceVisualDefinitions`.
+- Added `client/resource-editor.html` to tune render radius, collision radius, and collision offsets.
+- Editor resource list is loaded dynamically from JS definitions (no duplicated static HTML type list).
+
+### Collision Alignment
+- Tree collisions can be trunk-aligned with `collisionOffsetY`.
+- Solid-resource collision uses server-authoritative geometry with reduced radius and offset-aware center points.
+- Collision debug drawing is available in the resource drawer tooling.
