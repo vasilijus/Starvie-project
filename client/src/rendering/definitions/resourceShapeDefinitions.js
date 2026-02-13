@@ -1,14 +1,6 @@
-export const resourceShapeDefinitions = {
-    tree: { kind: 'tree' },
-    stone: { kind: 'stone' },
-    rock: { kind: 'stone' },
-    ore: { kind: 'stone' },
-    gem: { kind: 'stone' },
-    crystal: { kind: 'stone' },
-    ice: { kind: 'stone' },
-    default: { kind: 'circle' }
-};
+import { getResourceVisualDefinition } from './resourceVisualDefinitions.js';
 
 export function getResourceShapeDefinition(type) {
-    return resourceShapeDefinitions[type] || resourceShapeDefinitions.default;
+    const visual = getResourceVisualDefinition(type);
+    return { kind: visual.kind };
 }
