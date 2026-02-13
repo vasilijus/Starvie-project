@@ -17,7 +17,8 @@ export class Tree extends Resource {
             hp: 100,
             hpMax: 100,
             renderRadius: 20,
-            collisionRadius: 10,
+            collisionRadius: 9,
+            collisionOffsetY: 12,
             isSolid: true
         });
 
