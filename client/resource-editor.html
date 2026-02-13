@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resource Collision Editor</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #101218; color: #e7ecf6; }
+    .wrap { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+    .panel { padding: 16px; background: #171b26; border-right: 1px solid #2b3348; }
+    .panel h1 { font-size: 18px; margin: 0 0 12px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; margin-bottom: 4px; color: #b8c1d9; }
+    .field input, .field select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #3b4864; background: #0f1320; color: #e7ecf6; border-radius: 6px; }
+    .field input[type="checkbox"] { width: auto; margin-right: 8px; }
+    .inline { display: flex; align-items: center; gap: 8px; }
+    .value { color: #8fd1ff; font-weight: bold; }
+    .main { padding: 16px; display: grid; gap: 12px; align-content: start; }
+    canvas { background: radial-gradient(circle at center, #1f2533 0%, #131824 75%); border: 1px solid #2b3348; border-radius: 10px; }
+    pre { margin: 0; background: #0e1220; border: 1px solid #2b3348; border-radius: 8px; padding: 12px; color: #9ce0a7; }
+    .hint { font-size: 12px; color: #9aa6c4; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="panel">
+      <h1>Resource Visual Editor</h1>
+
+      <div class="field">
+        <label for="resourceType">Resource Type</label>
+        <select id="resourceType">
+          <option value="tree">tree</option>
+          <option value="stone">stone</option>
+          <option value="rock">rock</option>
+          <option value="berry">berry</option>
+          <option value="grass">grass</option>
+          <option value="mushroom">mushroom</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="resourceColor">Color</label>
+        <input id="resourceColor" type="color" value="#2d5016" />
+      </div>
+
+      <div class="field">
+        <label for="renderRadius">Render Radius: <span class="value" id="renderRadiusValue">20</span></label>
+        <input id="renderRadius" type="range" min="4" max="40" value="20" />
+      </div>
+
+      <div class="field">
+        <label for="collisionRadius">Collision Radius: <span class="value" id="collisionRadiusValue">9</span></label>
+        <input id="collisionRadius" type="range" min="0" max="30" value="9" />
+      </div>
+
+      <div class="field">
+        <label for="collisionOffsetX">Collision Offset X: <span class="value" id="collisionOffsetXValue">0</span></label>
+        <input id="collisionOffsetX" type="range" min="-30" max="30" value="0" />
+      </div>
+
+      <div class="field">
+        <label for="collisionOffsetY">Collision Offset Y: <span class="value" id="collisionOffsetYValue">12</span></label>
+        <input id="collisionOffsetY" type="range" min="-30" max="30" value="12" />
+      </div>
+
+      <div class="field inline">
+        <input id="isSolid" type="checkbox" checked />
+        <label for="isSolid">Solid resource</label>
+      </div>
+
+      <div class="field inline">
+        <input id="showCollision" type="checkbox" checked />
+        <label for="showCollision">Show collision circle</label>
+      </div>
+
+      <p class="hint">Red dashed circle = effective collision radius used by server (after reduction).</p>
+    </aside>
+
+    <main class="main">
+      <canvas id="previewCanvas" width="900" height="560"></canvas>
+      <pre id="resourceJson"></pre>
+    </main>
+  </div>
+
+  <script type="module" src="./src/tools/ResourceEditor.js"></script>
+</body>
+</html>
