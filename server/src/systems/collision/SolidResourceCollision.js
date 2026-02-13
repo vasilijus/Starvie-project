@@ -8,6 +8,16 @@ function getEntityRadius(entity) {
     return Math.max(2, (entity?.size || 20) / 2);
 }
 
+function getEntityCollisionCenter(entity) {
+    const radius = getEntityRadius(entity);
+
+    return {
+        x: (entity?.x || 0) + radius,
+        y: (entity?.y || 0) + radius,
+        radius
+    };
+}
+
 const COLLISION_RADIUS_REDUCTION = 2;
 
 function getResourceCollisionData(resource) {
@@ -22,7 +32,7 @@ function getResourceCollisionData(resource) {
 }
 
 export function isCollidingWithSolidResource(entity, resources = []) {
-    const entityRadius = getEntityRadius(entity);
+    const { x: entityX, y: entityY, radius: entityRadius } = getEntityCollisionCenter(entity);
 
     for (const resource of resources) {
         if (!resource?.isSolid) continue;
@@ -31,7 +41,7 @@ export function isCollidingWithSolidResource(entity, resources = []) {
         if (collisionRadius <= 0) continue;
 
         const minDistance = entityRadius + collisionRadius;
-        if (getDistSq(entity.x, entity.y, collisionX, collisionY) < (minDistance * minDistance)) {
+        if (getDistSq(entityX, entityY, collisionX, collisionY) < (minDistance * minDistance)) {
             return true;
         }
     }
