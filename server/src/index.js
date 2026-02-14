@@ -13,7 +13,26 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static('../client'));
+// app.use(express.static('../client'));
+
+// 1. Main site at '/' (loads files from '../client')
+app.use('/', express.static('../client'));
+
+// 2. Admin dashboard at '/admin' (loads files from '../admin-client')
+// Files in '../admin-client' will be accessible via http://localhost:3001/admin/
+// app.use('/admin', express.static('../admin-client'));
+
+// 2. Admin dashboard at '/admin' (loads files from '../admin-client')
+// Files in '../admin-client' will be accessible via http://localhost:3001/admin/
+app.use('/re', express.static('../resource-editor.html'));
+
+// app.use('/test', (req, res) => {
+//   res.send('GET request to the homepage')
+// });
+
+app.use('/test', (req, res) => {
+  res.send('GET request to the homepage')
+});
 
 const state = createGameState();
 

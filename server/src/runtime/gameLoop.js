@@ -7,7 +7,7 @@ function processMovementQueue(state) {
   while (state.movementQueue.length > 0) {
     const { id, dir } = state.movementQueue.shift();
     const player = state.players[id];
-    applyPlayerMovement(player, dir, state.worldSize);
+    applyPlayerMovement(player, dir, state.worldSize, state.resources);
   }
 }
 
@@ -77,7 +77,7 @@ export function startGameLoop(io, state) {
     cleanupDrops(state);
 
     const alivePlayers = getAlivePlayers(state);
-    updateEnemiesAI(state.enemies, alivePlayers, state.worldSize);
+    updateEnemiesAI(state.enemies, alivePlayers, state.worldSize, state.resources);
 
     broadcastState(io, state);
   }, TICK_RATE);
