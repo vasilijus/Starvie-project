@@ -3,7 +3,7 @@ import {
   Tree, BerryBush, StoneResource, GrassResource,
   MushroomResource, HerbResource, FlowerResource, LogResource,
   RockResource, SandResource, CactusResource, OreResource,
-  GemResource, IceResource, CrystalResource
+  GemResource, IceResource, CrystalResource, GoldResource, GrainResource
 } from './EnvironmentResource.js';
 
 import { generateGUID } from '../../utils/GUID.js';
@@ -68,6 +68,10 @@ export class ResourceFactory {
         return new IceResource(id, x, y);
       case 'crystal':
         return new CrystalResource(id, x, y);
+      case 'gold':
+        return new GoldResource(id, x, y);
+      case 'grain':
+        return new GrainResource(id, x, y);
       default:
         throw new Error(`Unknown resource type: ${type}`);
     }

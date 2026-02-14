@@ -17,7 +17,8 @@ export class Tree extends Resource {
             hp: 100,
             hpMax: 100,
             renderRadius: 20,
-            collisionRadius: 10,
+            collisionRadius: 9,
+            collisionOffsetY: 12,
             isSolid: true
         });
 
@@ -620,6 +621,78 @@ export class CrystalResource extends Resource {
         return {
             crystal: 1,
             xpReward: 40
+        };
+    }
+}
+/**
+ * Gold Resource
+ * Provides rare gold for advanced crafting/trading
+ */
+export class GoldResource extends Resource {
+    constructor(id, x, y) {
+        super(id, 'gold', x, y, {
+            quantity: 2,
+            maxQuantity: 2,
+            respawnEnabled: true,
+            respawnTime: 110000,
+            respawnRate: 0.015,
+            icon_color: '#d4af37',
+            size: 10,
+            hp: 240,
+            hpMax: 240
+        });
+
+        this.resourceYield = {
+            gold: { min: 1, max: 2 }
+        };
+    }
+
+    harvestResources() {
+        const amount = this.harvest(1);
+        if (amount === 0) return null;
+
+        return {
+            gold: Math.floor(Math.random() * 2 + 1),
+            xpReward: 30
+        };
+    }
+}
+
+/**
+ * Grain Resource
+ * Provides grain as a food/crafting ingredient
+ */
+export class GrainResource extends Resource {
+    constructor(id, x, y) {
+        super(id, 'grain', x, y, {
+            quantity: 8,
+            maxQuantity: 8,
+            respawnEnabled: true,
+            respawnTime: 18000,
+            respawnRate: 0.2,
+            icon_color: '#d9c565',
+            size: 11,
+            hp: 25,
+            hpMax: 25
+        });
+
+        this.resourceYield = {
+            grain: { min: 1, max: 3 }
+        };
+    }
+
+    harvestResources() {
+        const amount = this.harvest(1);
+        if (amount === 0) return null;
+
+        const grainAmount = Math.floor(
+            Math.random() * (this.resourceYield.grain.max - this.resourceYield.grain.min + 1) +
+            this.resourceYield.grain.min
+        );
+
+        return {
+            grain: grainAmount,
+            xpReward: 4
         };
     }
 }

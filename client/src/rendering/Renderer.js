@@ -89,7 +89,8 @@ export default class Renderer {
                 baseY: r.y - this.player.y + this.canvas.height / 2,
                 //  baseY: r.y - this.player.y + this.canvas.height / 2
                 offsetX: 0,
-                offsetY: 0
+                offsetY: 0,
+                canApplyVisualOffset: !r.isSolid
 
             }));
 
@@ -102,6 +103,12 @@ export default class Renderer {
                 for (let j = i + 1; j < resourceScreenPositions.length; j++) {
                     const r1 = resourceScreenPositions[i];
                     const r2 = resourceScreenPositions[j];
+
+                    // Keep solid resources at true world coordinates so collision and visuals match.
+                    // Visual spreading is only for non-solid resources to reduce clutter.
+                    if (!r1.canApplyVisualOffset || !r2.canApplyVisualOffset) {
+                        continue;
+                    }
 
                     // Calculate distance between resources (including offsets)
                     const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);

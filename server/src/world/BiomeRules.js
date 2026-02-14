@@ -20,7 +20,8 @@ export const BIOME_RULES = {
             { type: "tree", density: 0.04 },           // 4% - scattered trees
             { type: "berry", density: 0.03 },          // 3% - berries
             { type: "rock", density: 0.03 },           // 3% - stone
-            { type: "herb", density: 0.02 }            // 3% - herbs
+            { type: "herb", density: 0.02 },           // 2% - herbs
+            { type: "grain", density: 0.05 }           // 5% - wild grain
         ]
     },
 
@@ -32,7 +33,8 @@ export const BIOME_RULES = {
             { type: "sand", density: 0.07 },           // 7% - abundant
             { type: "cactus", density: 0.04 },         // 4% - water source
             { type: "ore", density: 0.001 },            // 5% - metal ore
-            { type: "gem", density: 0.02 }             // 2% - rare gems
+            { type: "gem", density: 0.02 },            // 2% - rare gems
+            { type: "gold", density: 0.008 }           // 0.8% - rare gold
         ]
     },
 
