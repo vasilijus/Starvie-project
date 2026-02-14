@@ -5,6 +5,12 @@ export const TILE_SIZE = 32;
 export const WORLD_CHUNKS = 10;
 
 const biomes = ["forest", "plains", "desert", "snow", "swamp"];
+const WATER_TILE_CHANCE = 0.08;
+
+function pseudoNoise(x, y, seed) {
+    const v = Math.sin((x * 12.9898) + (y * 78.233) + (seed * 37.719)) * 43758.5453;
+    return v - Math.floor(v);
+}
 
 function getProceduralBiome(cx, cy, seed) {
     // Later we can swap this with Perlin noise
@@ -53,10 +59,52 @@ function generateChunk(cx, cy, seed) {
     // Get biome rules for this biome
     const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
 
-    // Generate tiles
+    const chunkWorldTileX = cx * CHUNK_SIZE;
+    const chunkWorldTileY = cy * CHUNK_SIZE;
+
+    // Generate tiles with soft biome transitions and occasional water pockets.
+    // This avoids hard square chunk borders by sampling neighboring chunk biomes.
     for (let y = 0; y < CHUNK_SIZE; y++) {
         for (let x = 0; x < CHUNK_SIZE; x++) {
-            tiles.push(biome);
+            const worldTileX = chunkWorldTileX + x;
+            const worldTileY = chunkWorldTileY + y;
+            let tileBiome = biome;
+
+            const fx = x / (CHUNK_SIZE - 1);
+            const fy = y / (CHUNK_SIZE - 1);
+            const leftWeight = Math.max(0, (0.30 - fx) / 0.30);
+            const rightWeight = Math.max(0, (fx - 0.70) / 0.30);
+            const topWeight = Math.max(0, (0.30 - fy) / 0.30);
+            const bottomWeight = Math.max(0, (fy - 0.70) / 0.30);
+
+            const blendOptions = [
+                { w: leftWeight, biome: getProceduralBiome(cx - 1, cy, seed) },
+                { w: rightWeight, biome: getProceduralBiome(cx + 1, cy, seed) },
+                { w: topWeight, biome: getProceduralBiome(cx, cy - 1, seed) },
+                { w: bottomWeight, biome: getProceduralBiome(cx, cy + 1, seed) },
+                { w: leftWeight * topWeight, biome: getProceduralBiome(cx - 1, cy - 1, seed) },
+                { w: rightWeight * topWeight, biome: getProceduralBiome(cx + 1, cy - 1, seed) },
+                { w: leftWeight * bottomWeight, biome: getProceduralBiome(cx - 1, cy + 1, seed) },
+                { w: rightWeight * bottomWeight, biome: getProceduralBiome(cx + 1, cy + 1, seed) }
+            ];
+
+            const tileNoise = pseudoNoise(worldTileX, worldTileY, seed);
+            for (const option of blendOptions) {
+                if (option.w <= 0 || option.biome === biome) continue;
+                if (tileNoise < option.w * 0.85) {
+                    tileBiome = option.biome;
+                    break;
+                }
+            }
+
+            // Add deterministic water pools, stronger in swamp/snow biomes.
+            const waterNoise = pseudoNoise(worldTileX + 999, worldTileY + 999, seed);
+            const waterBias = (tileBiome === 'swamp' ? 0.08 : 0) + (tileBiome === 'snow' ? 0.03 : 0);
+            if (waterNoise < WATER_TILE_CHANCE + waterBias) {
+                tileBiome = 'water';
+            }
+
+            tiles.push(tileBiome);
         }
     }
 
@@ -150,7 +198,9 @@ export function getChunk(cx, cy, seed = 1) {
     // 1) Handmade chunk exists → use it
     if (handmadeChunks && handmadeChunks[key]) {
         const biome = handmadeChunks[key].biome;
-        const tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
+        const tiles = Array.isArray(handmadeChunks[key].tiles)
+            ? handmadeChunks[key].tiles
+            : new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
 
         // Add resources from biome rules for handmade chunks too
         const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];

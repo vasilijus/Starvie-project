@@ -9,7 +9,11 @@ const TILE_COLORS = {
     "snow": "#FFFFF0",
     "forest": "#228B22",
     "plains": "#7CFC00",
-    "desert": "#EDC9AF"
+    "desert": "#EDC9AF",
+    "swamp": "#6B8E23",
+    "water": "#3d80d6",
+    "mud": "#7a5a3a",
+    "quicksand": "#c2b280"
 };
 
 export class WorldRenderer {
@@ -54,10 +58,29 @@ export class WorldRenderer {
                 continue; // Skip rendering this chunk
             }
 
-            const biome = chunk.biome || 'plains';
-            const color = TILE_COLORS[biome] || TILE_COLORS['plains'];
-            ctx.fillStyle = color;
-            ctx.fillRect(baseX, baseY, chunkPixelSize, chunkPixelSize);
+            const defaultBiome = chunk.biome || 'plains';
+            const tiles = Array.isArray(chunk.tiles) ? chunk.tiles : null;
+
+            if (!tiles || tiles.length !== CHUNK_SIZE * CHUNK_SIZE) {
+                const color = TILE_COLORS[defaultBiome] || TILE_COLORS['plains'];
+                ctx.fillStyle = color;
+                ctx.fillRect(baseX, baseY, chunkPixelSize, chunkPixelSize);
+                continue;
+            }
+
+            for (let ty = 0; ty < CHUNK_SIZE; ty++) {
+                for (let tx = 0; tx < CHUNK_SIZE; tx++) {
+                    const tileBiome = tiles[ty * CHUNK_SIZE + tx] || defaultBiome;
+                    const color = TILE_COLORS[tileBiome] || TILE_COLORS['plains'];
+                    ctx.fillStyle = color;
+                    ctx.fillRect(
+                        baseX + tx * TILE_SIZE,
+                        baseY + ty * TILE_SIZE,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                }
+            }
         }
     }
 }
