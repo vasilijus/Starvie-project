@@ -28,8 +28,13 @@ export default class Renderer {
             // console.log(`Players`, players)
             const sx = p.x - px + this.canvas.width / 2;
             const sy = p.y - py + this.canvas.height / 2;
-            ctx.fillStyle = id === state.socketId || id === this.player.id ? 'blue' : 'red';
-
+            const playerThis = 'rgba(200,150,100,0.9)'
+            const playerOther = 'rgba(139, 28, 28, 0.9)'
+            ctx.fillStyle = id === state.socketId || id === this.player.id ? playerThis : playerOther;
+            // ctx.strokeStyle = '#0a5800';
+            // ctx.lineWidth = 1;
+            // ctx.stroke();
+            
             // For local player use client-side state (includes attack animation)
             if (id === this.player.id) {
                 const cp = this.player;
