@@ -12,6 +12,25 @@ function pseudoNoise(x, y, seed) {
     return v - Math.floor(v);
 }
 
+
+
+function hashNoise(x, y, seed, salt = 0) {
+    const value = Math.sin((x * 127.1) + (y * 311.7) + (seed * 74.7) + (salt * 19.19)) * 43758.5453123;
+    return value - Math.floor(value);
+}
+
+function jitterOffset(tileX, tileY, seed, salt = 0) {
+    const jx = (hashNoise(tileX, tileY, seed, salt) - 0.5) * TILE_SIZE * 0.55;
+    const jy = (hashNoise(tileX + 17, tileY - 23, seed, salt + 7) - 0.5) * TILE_SIZE * 0.55;
+    return { x: jx, y: jy };
+}
+
+function getResourceSpacing(density) {
+    if (density <= 0.015) return 3;
+    if (density <= 0.04) return 2;
+    return 1;
+}
+
 function getProceduralBiome(cx, cy, seed) {
     // Later we can swap this with Perlin noise
     const biomeIndex = Math.floor((cx + cy + seed) / 2) % biomes.length;
@@ -111,80 +130,66 @@ function generateChunk(cx, cy, seed) {
     // Track occupied tile positions to prevent overlaps
     const occupiedTiles = new Set();
 
-    // Helper function to find a free nearby tile position
-    function findFreeTilePosition(preferredX, preferredY, maxSearchRadius = 3) {
-        // Check if preferred position is free
-        const key = `${preferredX},${preferredY}`;
-        if (!occupiedTiles.has(key)) {
-            return { x: preferredX, y: preferredY };
-        }
-
-        // Spiral outward to find a free tile
-        for (let radius = 1; radius <= maxSearchRadius; radius++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-                for (let dy = -radius; dy <= radius; dy++) {
-                    // Only check positions on the current radius boundary
-                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-
-                    const checkX = preferredX + dx;
-                    const checkY = preferredY + dy;
-
-                    // Check bounds
-                    if (checkX < 0 || checkX >= CHUNK_SIZE || checkY < 0 || checkY >= CHUNK_SIZE) {
-                        continue;
-                    }
-
-                    const checkKey = `${checkX},${checkY}`;
-                    if (!occupiedTiles.has(checkKey)) {
-                        return { x: checkX, y: checkY };
-                    }
-                }
-            }
-        }
-
-        // If no free position found within search radius, return original with offset anyway
-        return { x: preferredX, y: preferredY };
-    }
-
     // Generate resources based on biome rules
     if (biomeRule.resources) {
-        const chunkSeed = cx * 73856093 ^ cy * 19349663 ^ seed; // Generate consistent seed per chunk
+        const chunkSeed = cx * 73856093 ^ cy * 19349663 ^ seed;
 
         for (const resourceRule of biomeRule.resources) {
             const { type, density, icon_color } = resourceRule;
             const expectedCount = Math.round((CHUNK_SIZE * CHUNK_SIZE) * density);
+            const densityVariance = hashNoise(cx, cy, chunkSeed, type.charCodeAt(0)) * 0.4 + 0.8; // 0.8 -> 1.2
+            const targetCount = Math.max(0, Math.round(expectedCount * densityVariance));
+            const minSpacing = getResourceSpacing(density);
 
-            // Iterate through each tile in the chunk
+            const candidates = [];
             for (let tileY = 0; tileY < CHUNK_SIZE; tileY++) {
                 for (let tileX = 0; tileX < CHUNK_SIZE; tileX++) {
-                    // Generate a deterministic but pseudo-random value for this specific tile
-                    const tileHash = chunkSeed + tileX * 73856093 + tileY * 19349663 + type.charCodeAt(0) * 27644437;
-                    const pseudoRand = Math.sin(tileHash) * 43758.5453;
-                    const randomVal = pseudoRand - Math.floor(pseudoRand);
+                    const idx = tileY * CHUNK_SIZE + tileX;
+                    if (tiles[idx] === 'water') continue;
 
-                    // Place resource if random roll succeeds (based on density)
-                    if (randomVal < density) {
-                        const key = `${tileX},${tileY}`;
+                    const macroNoise = hashNoise(cx * CHUNK_SIZE + tileX, cy * CHUNK_SIZE + tileY, chunkSeed, type.length);
+                    const localNoise = hashNoise(tileX, tileY, chunkSeed, type.charCodeAt(0));
+                    const score = macroNoise * 0.65 + localNoise * 0.35;
+                    candidates.push({ tileX, tileY, score });
+                }
+            }
 
-                        // Only place if tile is free
-                        if (!occupiedTiles.has(key)) {
-                            occupiedTiles.add(key);
+            // Deterministic order gives stable generation while removing row/column patterns.
+            candidates.sort((a, b) => b.score - a.score);
 
-                            // Convert tile position to world position
-                            const worldX = cx * CHUNK_SIZE * TILE_SIZE + tileX * TILE_SIZE + TILE_SIZE / 2;
-                            const worldY = cy * CHUNK_SIZE * TILE_SIZE + tileY * TILE_SIZE + TILE_SIZE / 2;
+            const selected = [];
+            for (const candidate of candidates) {
+                if (selected.length >= targetCount) break;
 
-                            resources.push({
-                                type,
-                                x: worldX,
-                                y: worldY,
-                                icon_color, // Include icon_color from biome rules
-                                hp: 100,
-                                hpMax: 100
-                            });
-                        }
+                const key = `${candidate.tileX},${candidate.tileY}`;
+                if (occupiedTiles.has(key)) continue;
+
+                let tooClose = false;
+                for (const placed of selected) {
+                    const dx = placed.tileX - candidate.tileX;
+                    const dy = placed.tileY - candidate.tileY;
+                    if ((dx * dx + dy * dy) < (minSpacing * minSpacing)) {
+                        tooClose = true;
+                        break;
                     }
                 }
+                if (tooClose) continue;
+
+                occupiedTiles.add(key);
+                selected.push(candidate);
+
+                const jitter = jitterOffset(candidate.tileX, candidate.tileY, chunkSeed, type.charCodeAt(0));
+                const tileBaseX = cx * CHUNK_SIZE * TILE_SIZE + candidate.tileX * TILE_SIZE + TILE_SIZE / 2;
+                const tileBaseY = cy * CHUNK_SIZE * TILE_SIZE + candidate.tileY * TILE_SIZE + TILE_SIZE / 2;
+
+                resources.push({
+                    type,
+                    x: tileBaseX + jitter.x,
+                    y: tileBaseY + jitter.y,
+                    icon_color,
+                    hp: 100,
+                    hpMax: 100
+                });
             }
         }
     }
@@ -202,8 +207,7 @@ export function getChunk(cx, cy, seed = 1) {
             ? handmadeChunks[key].tiles
             : new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
 
-        // Add resources from biome rules for handmade chunks too
-        const biomeRule = BIOME_RULES[biome] || BIOME_RULES['plains'];
+        // Keep authored resources from handmade maps when present.
         const resources = handmadeChunks[key].resources || [];
 
         return { biome, tiles, resources };
