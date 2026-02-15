@@ -21,6 +21,8 @@ export default class InputHandler {
         this.lastSentFacing = null;
         this.lastFacingSentAt = 0;
         this.facingSendIntervalMs = 50;
+        this.lastMoveSentAt = 0;
+        this.moveSendIntervalMs = 1000 / 30;
 
         window.addEventListener('keydown', e => this.keys[e.key] = true);
         window.addEventListener('keyup', e => this.keys[e.key] = false);
@@ -63,11 +65,23 @@ export default class InputHandler {
     }
 
     maybeEmitMovement(dir) {
+        const now = Date.now();
+        const isMoving = dir.x !== 0 || dir.y !== 0;
+
+        if (isMoving) {
+            if (now - this.lastMoveSentAt < this.moveSendIntervalMs) return;
+            this.network.emit('playerInput', dir);
+            this.lastSentMove = { ...dir };
+            this.lastMoveSentAt = now;
+            return;
+        }
+
         const prev = this.lastSentMove;
-        if (prev && prev.x === dir.x && prev.y === dir.y) return;
+        if (prev && prev.x === 0 && prev.y === 0) return;
 
         this.network.emit('playerInput', dir);
         this.lastSentMove = { ...dir };
+        this.lastMoveSentAt = now;
     }
 
     startSendLoop() {
