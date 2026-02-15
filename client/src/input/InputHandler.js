@@ -1,5 +1,3 @@
-import { RENDER_SCALE } from '../rendering/CameraConfig.js';
-
 // ...existing code...
 let EDIT_MODE = false;
 let selectedBiome = "plains";
@@ -40,8 +38,10 @@ export default class InputHandler {
     handleMouseMove(e) {
         if (this.mapEditor && this.mapEditor.isActive) return;
 
-        const mouseWorldX = this.player.x + (e.clientX - this.canvas.width / 2) / RENDER_SCALE;
-        const mouseWorldY = this.player.y + (e.clientY - this.canvas.height / 2) / RENDER_SCALE;
+        const cameraX = this.player.renderX ?? this.player.x;
+        const cameraY = this.player.renderY ?? this.player.y;
+        const mouseWorldX = cameraX - this.canvas.width / 2 + e.clientX;
+        const mouseWorldY = cameraY - this.canvas.height / 2 + e.clientY;
 
         const dx = mouseWorldX - this.player.x;
         const dy = mouseWorldY - this.player.y;
@@ -156,8 +156,8 @@ export default class InputHandler {
 
     getWorldClick(e) {
         return {
-            x: this.player.x + (e.clientX - this.canvas.width / 2) / RENDER_SCALE,
-            y: this.player.y + (e.clientY - this.canvas.height / 2) / RENDER_SCALE
+            x: (this.player.renderX ?? this.player.x) - this.canvas.width / 2 + e.clientX,
+            y: (this.player.renderY ?? this.player.y) - this.canvas.height / 2 + e.clientY
         };
     }
 

@@ -1,6 +1,4 @@
 
-import { RENDER_SCALE } from './CameraConfig.js';
-
 export const CHUNK_SIZE = 10;
 export const TILE_SIZE = 32;
 export const WORLD_CHUNKS = 10;
@@ -34,14 +32,14 @@ export class WorldRenderer {
         }
 
         // Use integer-aligned camera coordinates to avoid sub-pixel tile seams.
-        const px = player?.x || 0;
-        const py = player?.y || 0;
+        const px = player?.renderX ?? player?.x ?? 0;
+        const py = player?.renderY ?? player?.y ?? 0;
 
         const canvasWidth = ctx.canvas.width;
         const canvasHeight = ctx.canvas.height;
-        const chunkWorldSize = CHUNK_SIZE * TILE_SIZE;
-        const chunkPixelSize = chunkWorldSize * RENDER_SCALE;
-        const tilePixelSize = TILE_SIZE * RENDER_SCALE;
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const cameraX = px - canvasWidth / 2;
+        const cameraY = py - canvasHeight / 2;
 
         // Calculate which chunks are within the viewport
         // Add padding to render chunks slightly off-screen for smooth scrolling
@@ -56,11 +54,9 @@ export class WorldRenderer {
             if (!chunk) continue;
 
             const [chunkX, chunkY] = key.split(',').map(Number);
-            const chunkWorldX = chunkX * chunkWorldSize;
-            const chunkWorldY = chunkY * chunkWorldSize;
-            // Draw using camera-relative transform with zoom scaling.
-            const baseX = Math.round((chunkWorldX - px) * RENDER_SCALE + canvasWidth / 2);
-            const baseY = Math.round((chunkWorldY - py) * RENDER_SCALE + canvasHeight / 2);
+            // Draw using integer world->screen transform shared by all chunks/tiles.
+            const baseX = chunkX * chunkPixelSize - cameraX;
+            const baseY = chunkY * chunkPixelSize - cameraY;
 
             // Viewport culling: only render if chunk is visible or near-visible
             if (baseX + chunkPixelSize < minScreenX || baseX > maxScreenX ||
@@ -83,9 +79,9 @@ export class WorldRenderer {
                     const tileBiome = tiles[ty * CHUNK_SIZE + tx] || defaultBiome;
                     const color = TILE_COLORS[tileBiome] || TILE_COLORS['plains'];
                     ctx.fillStyle = color;
-                    const tileX = baseX + tx * tilePixelSize;
-                    const tileY = baseY + ty * tilePixelSize;
-                    ctx.fillRect(tileX, tileY, tilePixelSize, tilePixelSize);
+                    const tileX = baseX + tx * TILE_SIZE;
+                    const tileY = baseY + ty * TILE_SIZE;
+                    ctx.fillRect(tileX, tileY, TILE_SIZE, TILE_SIZE);
                 }
             }
         }

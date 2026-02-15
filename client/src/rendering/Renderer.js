@@ -1,6 +1,5 @@
 import { drawEnemy } from './drawers/enemyDrawer.js';
 import { drawResource } from './drawers/resourceDrawer.js';
-import { RENDER_SCALE } from './CameraConfig.js';
 
 export default class Renderer {
     constructor(canvas, ctx, player, worldRenderer, mapEditor = null) {
@@ -11,10 +10,10 @@ export default class Renderer {
         this.mapEditor = mapEditor;
     }
 
-    worldToScreen(x, y, px, py) {
+    getCameraPosition() {
         return {
-            sx: (x - px) * RENDER_SCALE + this.canvas.width / 2,
-            sy: (y - py) * RENDER_SCALE + this.canvas.height / 2
+            x: this.player?.renderX ?? this.player?.x ?? 0,
+            y: this.player?.renderY ?? this.player?.y ?? 0
         };
     }
 
@@ -26,15 +25,19 @@ export default class Renderer {
         this.worldRenderer.draw(ctx, state.world, this.player);
 
         // Use player position directly
-        const px = this.player?.x || 0;
-        const py = this.player?.y || 0;
+        const camera = this.getCameraPosition();
+        const px = camera.x;
+        const py = camera.y;
 
         // players
         for (const id in players) {
             const p = players[id];
             //   console.log(`Player: ${p.id}`)
             // console.log(`Players`, players)
-            const { sx, sy } = this.worldToScreen(p.x, p.y, px, py);
+            const drawX = id === this.player.id ? (this.player.renderX ?? this.player.x) : p.x;
+            const drawY = id === this.player.id ? (this.player.renderY ?? this.player.y) : p.y;
+            const sx = drawX - px + this.canvas.width / 2;
+            const sy = drawY - py + this.canvas.height / 2;
             const playerThis = 'rgba(200,150,100,0.9)'
             const playerOther = 'rgba(139, 28, 28, 0.9)'
             ctx.fillStyle = id === state.socketId || id === this.player.id ? playerThis : playerOther;
@@ -50,11 +53,11 @@ export default class Renderer {
                 // (comment out when no longer needed)
                 // eslint-disable-next-line no-console
                 // console.log(`[Renderer] local attack: isAttacking=${cp.isAttacking} progress=${cp.attackProgress.toFixed(2)}`);
-                this.drawRotatedPlayer(ctx, sx, sy, cp.size * RENDER_SCALE, dir, cp);
+                this.drawRotatedPlayer(ctx, sx, sy, cp.size, dir, cp);
             } else {
                 // remote player: draw based on server state
                 if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
-                    this.drawRotatedPlayer(ctx, sx, sy, this.player.size * RENDER_SCALE, p.facingDirection, null);
+                    this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection, null);
                 } else {
                     // ctx.fillRect(sx, sy, this.player.size, this.player.size);
                     ctx.roundRect(10, 150, 150, 100, [10, 10]);
@@ -70,12 +73,13 @@ export default class Renderer {
         const playerScreenY = this.canvas.height / 2;
         // console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
         // Testing debug
-        this.drawDirectionLine(ctx, playerScreenX + (this.player.size * RENDER_SCALE)/2, playerScreenY +(this.player.size * RENDER_SCALE)/2, this.player.facingDirection);
+        this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
 
         // enemies
         for (const enemy of enemies) {
-            const { sx, sy } = this.worldToScreen(enemy.x, enemy.y, px, py);
-            drawEnemy(ctx, { ...enemy, size: (enemy.size || 20) * RENDER_SCALE }, sx, sy);
+            const sx = enemy.x - px + this.canvas.width / 2;
+            const sy = enemy.y - py + this.canvas.height / 2;
+            drawEnemy(ctx, enemy, sx, sy);
             if (enemy.hp < enemy.hpMax)
                 this.drawHealth(ctx, sx, sy, enemy.hp);
         }
@@ -84,14 +88,15 @@ export default class Renderer {
         // First pass: Calculate screen positions for all resources
         const resourceScreenPositions = resources
             .filter(r => {
-                const { sx, sy } = this.worldToScreen(r.x, r.y, px, py);
+                const sx = r.x - px + this.canvas.width / 2;
+                const sy = r.y - py + this.canvas.height / 2;
                 // Check if on-screen
                 return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
             })
             .map(r => ({
                 resource: r,
-                baseX: (r.x - this.player.x) * RENDER_SCALE + this.canvas.width / 2,
-                baseY: (r.y - this.player.y) * RENDER_SCALE + this.canvas.height / 2,
+                baseX: r.x - px + this.canvas.width / 2,
+                baseY: r.y - py + this.canvas.height / 2,
                 //  baseY: r.y - this.player.y + this.canvas.height / 2
                 offsetX: 0,
                 offsetY: 0,
@@ -101,7 +106,7 @@ export default class Renderer {
 
         // Second pass: Apply offsets to overlapping resources.
         // Keep this bounded so it cannot dominate frame time in crowded scenes.
-        const MIN_DISTANCE = 35 * RENDER_SCALE;
+        const MIN_DISTANCE = 35;
         const resourceCount = resourceScreenPositions.length;
         const SEPARATION_ITERATIONS = resourceCount > 120 ? 1 : resourceCount > 60 ? 2 : 3;
 
@@ -169,12 +174,11 @@ export default class Renderer {
             const sx = baseX + offsetX;
             const sy = baseY + offsetY;
 
-            const scaledResource = { ...r, renderRadius: (r.renderRadius || r.size || 10) * RENDER_SCALE };
-            const { color, renderRadius } = drawResource(ctx, scaledResource, sx, sy);
+            const { color, renderRadius } = drawResource(ctx, r, sx, sy);
 
             // Draw resource type label (small text above resource)
             ctx.fillStyle = color;
-            ctx.font = `${10 * RENDER_SCALE}px Arial`;
+            ctx.font = '10px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(r.type || 'resource', sx, sy - (renderRadius + 6));
 
@@ -182,10 +186,10 @@ export default class Renderer {
             if (r.hp !== undefined && r.hpMax !== undefined && r.hp < r.hpMax) {
                 const hpPercent = r.hp / r.hpMax;
                 ctx.fillStyle = hpPercent > 0.5 ? '#00AA00' : hpPercent > 0.25 ? '#FFAA00' : '#AA0000';
-                ctx.fillRect(sx - 4 * RENDER_SCALE, sy - 10 * RENDER_SCALE, 8 * RENDER_SCALE * hpPercent, 2 * RENDER_SCALE);
+                ctx.fillRect(sx - 4, sy - 10, 8 * hpPercent, 2);
                 ctx.strokeStyle = '#333333';
                 ctx.lineWidth = 0.5;
-                ctx.strokeRect(sx - 4 * RENDER_SCALE, sy - 10 * RENDER_SCALE, 8 * RENDER_SCALE, 2 * RENDER_SCALE);
+                ctx.strokeRect(sx - 4, sy - 10, 8, 2);
             }
         }
 
@@ -195,13 +199,13 @@ export default class Renderer {
         this.player.activeEffects.forEach((effect, index) => {
             // 1. Calculate Screen Position
             // Subtract the world camera offset so the circle "sticks" to the ground
-            const screenX = (effect.x - this.player.x) * RENDER_SCALE + this.canvas.width / 2;
-            const screenY = (effect.y - this.player.y) * RENDER_SCALE + this.canvas.height / 2;
+            const screenX = effect.x - (px - this.canvas.width / 2);
+            const screenY = effect.y - (py - this.canvas.height / 2);
 
             // 2. Draw using the NEW screen coordinates
             this.ctx.beginPath();
             const radius = (1.2 - effect.life) * 50; // Expands as it fades
-            this.ctx.arc(screenX, screenY, 20 * RENDER_SCALE, 0, Math.PI * 2);
+            this.ctx.arc(screenX, screenY, 20, 0, Math.PI * 2);
 
             // this.ctx.arc(effect.x, effect.y, 20, 0, Math.PI * 2);
 
@@ -210,7 +214,7 @@ export default class Renderer {
                 ? `rgba(255, 0, 0, ${effect.life})`
                 : `rgba(0, 255, 0, ${effect.life})`;
 
-            this.ctx.lineWidth = 2 * RENDER_SCALE;
+            this.ctx.lineWidth = 2;
             this.ctx.stroke();
 
             // 3. Update & Cleanup
@@ -218,7 +222,7 @@ export default class Renderer {
             if (effect.life <= 0) this.player.activeEffects.splice(index, 1);
 
             this.ctx.fillStyle = effect.type === 'combat' ? `rgba(255,0,0,${effect.life})` : `rgba(0,255,0,${effect.life})`; // Choose a color that stands out
-            this.ctx.font = `${22 * RENDER_SCALE}px Arial`; // Set size and font
+            this.ctx.font = "22px Arial"; // Set size and font
             this.ctx.textAlign = "left";  // Align text to the start of your coordinates
             // Use fillText(text, x, y) to place it next to the bar
             // (x + 30) moves it just past the end of a full 100% bar
@@ -236,13 +240,14 @@ export default class Renderer {
         // Draw enemy drops (temporary loot)
         const dropScreenPositions = enemyDrops
             .filter(d => {
-                const { sx, sy } = this.worldToScreen(d.x, d.y, px, py);
+                const sx = d.x - px + this.canvas.width / 2;
+                const sy = d.y - py + this.canvas.height / 2;
                 return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
             })
             .map(d => ({
                 drop: d,
-                baseX: (d.x - this.player.x) * RENDER_SCALE + this.canvas.width / 2,
-                baseY: (d.y - this.player.y) * RENDER_SCALE + this.canvas.height / 2
+                baseX: d.x - px + this.canvas.width / 2,
+                baseY: d.y - py + this.canvas.height / 2
             }));
 
         for (const { drop: d, baseX, baseY } of dropScreenPositions) {
@@ -253,20 +258,20 @@ export default class Renderer {
             const color = d.icon_color || '#FFD700';
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(sx, sy, 6 * RENDER_SCALE, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
             ctx.fill();
 
             // Draw drop type label
             ctx.fillStyle = color;
-            ctx.font = `${10 * RENDER_SCALE}px Arial`;
+            ctx.font = '10px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(d.type, sx, sy - 10 * RENDER_SCALE);
+            ctx.fillText(d.type, sx, sy - 10);
 
             // Show quantity if > 1
             if (d.quantity > 1) {
                 ctx.fillStyle = '#fff';
-                ctx.font = `bold ${9 * RENDER_SCALE}px Arial`;
-                ctx.fillText(`x${d.quantity}`, sx + 8 * RENDER_SCALE, sy + 8 * RENDER_SCALE);
+                ctx.font = 'bold 9px Arial';
+                ctx.fillText(`x${d.quantity}`, sx + 8, sy + 8);
             }
         }
     }
@@ -281,30 +286,30 @@ export default class Renderer {
         else if (hp < 80) barColor = "#d1bf00";
         // 2. Draw the Health Bar
         ctx.fillStyle = barColor;
-        ctx.fillRect(x - 5 * RENDER_SCALE, y - 20 * RENDER_SCALE, (hp / 100) * 30 * RENDER_SCALE, 5 * RENDER_SCALE);
+        ctx.fillRect(x - 5, y - 20, (hp / 100) * 30, 5);
         // 3. Draw the HP Number
         ctx.fillStyle = "black"; // Choose a color that stands out
-        ctx.font = `${9 * RENDER_SCALE}px Arial`; // Set size and font
+        ctx.font = "9px Arial"; // Set size and font
         ctx.textAlign = "left";  // Align text to the start of your coordinates
         // Use fillText(text, x, y) to place it next to the bar
         // (x + 30) moves it just past the end of a full 100% bar
-        ctx.fillText(Math.floor(hp), x + 2 * RENDER_SCALE, y - 25 * RENDER_SCALE);
+        ctx.fillText(Math.floor(hp), x + 2, y - 25);
     }
     drawDirectionLine(ctx, centerX, centerY, direction) {
         if (!direction) return;
-        const length = 30 * RENDER_SCALE; // Length of the direction line
+        const length = 30; // Length of the direction line
         const endX = centerX + direction.x * length;
         const endY = centerY + direction.y * length;
 
         ctx.strokeStyle = 'yellow';
-        ctx.lineWidth = 2 * RENDER_SCALE;
+        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
         // Draw arrowhead
-        const arrowSize = 8 * RENDER_SCALE;
+        const arrowSize = 8;
         const angle = Math.atan2(direction.y, direction.x);
         ctx.fillStyle = 'yellow';
         ctx.beginPath();
