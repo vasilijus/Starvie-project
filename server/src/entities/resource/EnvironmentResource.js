@@ -453,7 +453,9 @@ export class CactusResource extends Resource {
             icon_color: '#6B8E23',
             size: 15,
             hp: 80,
-            hpMax: 80
+            hpMax: 80,            
+            collisionRadius: 12,
+            isSolid: true
         });
 
         this.resourceYield = {
@@ -489,7 +491,9 @@ export class OreResource extends Resource {
             icon_color: '#696969',
             size: 13,
             hp: 200,
-            hpMax: 200
+            hpMax: 200,
+            collisionRadius: 10,
+            isSolid: true
         });
 
         this.resourceYield = {
