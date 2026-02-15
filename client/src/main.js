@@ -92,10 +92,6 @@ playBtn.addEventListener('click', () => {
     // store last state for input detection & rendering
     input.lastState = data;
     lastState = data;
-    // render immediately for lower perceived latency
-    renderer.render(data);
-    // draw status panel overlay immediately
-    statusPanel.draw(ctx, player);
   });
 
   function loop() {

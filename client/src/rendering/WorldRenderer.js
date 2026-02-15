@@ -32,14 +32,14 @@ export class WorldRenderer {
         }
 
         // Use integer-aligned camera coordinates to avoid sub-pixel tile seams.
-        const px = player?.x || 0;
-        const py = player?.y || 0;
+        const px = player?.renderX ?? player?.x ?? 0;
+        const py = player?.renderY ?? player?.y ?? 0;
 
         const canvasWidth = ctx.canvas.width;
         const canvasHeight = ctx.canvas.height;
         const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
-        const cameraX = Math.round(px - canvasWidth / 2);
-        const cameraY = Math.round(py - canvasHeight / 2);
+        const cameraX = px - canvasWidth / 2;
+        const cameraY = py - canvasHeight / 2;
 
         // Calculate which chunks are within the viewport
         // Add padding to render chunks slightly off-screen for smooth scrolling
