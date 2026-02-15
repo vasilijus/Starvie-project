@@ -20,6 +20,9 @@ export class WorldRenderer {
     draw(ctx, world, player) {
         if (!ctx || !ctx.canvas) return;
 
+        // Keep rasterization stable to avoid hairline seams / chessboard-like tile borders.
+        ctx.imageSmoothingEnabled = false;
+
         // If no world/chunks, clear to a sane default instead of leaving a black canvas
         if (!world || !world.chunks) {
             ctx.fillStyle = TILE_COLORS['plains'];
@@ -28,13 +31,15 @@ export class WorldRenderer {
             return;
         }
 
-        // Use player position directly
+        // Use integer-aligned camera coordinates to avoid sub-pixel tile seams.
         const px = player?.x || 0;
         const py = player?.y || 0;
 
         const canvasWidth = ctx.canvas.width;
         const canvasHeight = ctx.canvas.height;
         const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const cameraX = Math.round(px - canvasWidth / 2);
+        const cameraY = Math.round(py - canvasHeight / 2);
 
         // Calculate which chunks are within the viewport
         // Add padding to render chunks slightly off-screen for smooth scrolling
@@ -49,9 +54,9 @@ export class WorldRenderer {
             if (!chunk) continue;
 
             const [chunkX, chunkY] = key.split(',').map(Number);
-            // Snap chunk origin to whole pixels to avoid anti-aliased seams between tiles.
-            const baseX = Math.floor(chunkX * chunkPixelSize - px + canvasWidth / 2);
-            const baseY = Math.floor(chunkY * chunkPixelSize - py + canvasHeight / 2);
+            // Draw using integer world->screen transform shared by all chunks/tiles.
+            const baseX = chunkX * chunkPixelSize - cameraX;
+            const baseY = chunkY * chunkPixelSize - cameraY;
 
             // Viewport culling: only render if chunk is visible or near-visible
             if (baseX + chunkPixelSize < minScreenX || baseX > maxScreenX ||
@@ -76,8 +81,7 @@ export class WorldRenderer {
                     ctx.fillStyle = color;
                     const tileX = baseX + tx * TILE_SIZE;
                     const tileY = baseY + ty * TILE_SIZE;
-                    // Slight overlap hides 1px cracks when camera moves on fractional positions.
-                    ctx.fillRect(tileX, tileY, TILE_SIZE + 1, TILE_SIZE + 1);
+                    ctx.fillRect(tileX, tileY, TILE_SIZE, TILE_SIZE);
                 }
             }
         }
