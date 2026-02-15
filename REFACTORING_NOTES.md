@@ -137,3 +137,18 @@ All public APIs remain the same:
 5. **Add trading system** - Player-to-player commerce
 6. **Add skills** - Track individual skill progress
 7. **Add conditions** - Buffs, debuffs, status effects
+
+
+---
+
+## Post-Refactor Extension Notes (Resources + AI)
+
+This codebase has since been extended beyond the original player/system split refactor:
+
+- Added dynamic resource visual definitions and an editor page for rapid shape + collision iteration.
+- Added `gold` and `grain` resource types with biome integration.
+- Hardened collision parity between server and client visuals.
+- Expanded enemy framework to support per-enemy behavior traits and a passive flee state.
+- Added hyena/rabbit enemy classes, updated spawn pool, and added loot tables for both.
+
+These updates keep the modular architecture direction while expanding gameplay systems.

@@ -4,10 +4,15 @@ const TILE_COLORS = {
     "snow": "#FFFFF0",
     "forest": "#228B22",
     "plains": "#7CFC00",
-    "desert": "#EDC9AF"
+    "desert": "#EDC9AF",
+    "swamp": "#6B8E23",
+    "water": "#3d80d6",
+    "mud": "#7a5a3a",
+    "quicksand": "#c2b280"
 };
 
-const BIOMES = ["plains", "forest", "desert", "snow"];
+const BIOMES = ["plains", "forest", "desert", "snow", "swamp"];
+const TILE_PALETTE = ["water", "mud", "quicksand"];
 
 export class MapEditor {
     constructor(canvas, ctx, player, worldRenderer, network = null) {
@@ -18,6 +23,7 @@ export class MapEditor {
         this.network = network;
         this.isActive = false;
         this.selectedBiome = "plains";
+        this.paintMode = "chunk";
         this.world = null;
 
         // Editor UI
@@ -51,6 +57,14 @@ export class MapEditor {
           ${BIOMES.map(b => `<button id="biome-${b}" style="margin: 2px; padding: 5px 10px; background: ${TILE_COLORS[b]}; color: #000; border: 1px solid #333; cursor: pointer; border-radius: 3px;">${b}</button>`).join('')}
         </div>
       </div>
+      <div style="margin-top: 10px; border-top: 1px solid #055; padding-top: 8px;">
+        <div>Mode: <span id="paintModeLabel">Chunk</span></div>
+        <button id="modeToggle" style="margin: 5px 0; width: 100%; padding: 8px; background: #ff9; color: #000; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;">Toggle Tile Paint (T)</button>
+        <div style="margin: 5px 0;">Tile Palette:</div>
+        <div>
+          ${TILE_PALETTE.map(t => `<button id="tile-${t}" style="margin: 2px; padding: 4px 8px; background: ${TILE_COLORS[t]}; color: #000; border: 1px solid #333; cursor: pointer; border-radius: 3px;">${t}</button>`).join('')}
+        </div>
+      </div>
       <div style="margin-top: 10px;">
         <button id="gridToggle" style="margin: 5px 0; width: 100%; padding: 8px; background: #0f9; color: #000; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;">Show Grid (G)</button>
       </div>
@@ -73,6 +87,19 @@ export class MapEditor {
                 this.selectedBiome = biome;
                 document.getElementById('biomeName').textContent = biome;
             });
+        });
+
+        // Tile palette buttons
+        TILE_PALETTE.forEach(tile => {
+            document.getElementById(`tile-${tile}`).addEventListener('click', () => {
+                this.selectedBiome = tile;
+                document.getElementById('biomeName').textContent = tile;
+            });
+        });
+
+        document.getElementById('modeToggle').addEventListener('click', () => {
+            this.paintMode = this.paintMode === 'chunk' ? 'tile' : 'chunk';
+            document.getElementById('paintModeLabel').textContent = this.paintMode === 'chunk' ? 'Chunk' : 'Tile';
         });
 
         // Grid toggle
@@ -117,8 +144,22 @@ export class MapEditor {
         return { chunkX, chunkY };
     }
 
+    worldToTile(worldX, worldY) {
+        const chunkPixels = CHUNK_SIZE * TILE_SIZE;
+        const chunkX = Math.floor(worldX / chunkPixels);
+        const chunkY = Math.floor(worldY / chunkPixels);
+        const localX = Math.floor((worldX - chunkX * chunkPixels) / TILE_SIZE);
+        const localY = Math.floor((worldY - chunkY * chunkPixels) / TILE_SIZE);
+        return { chunkX, chunkY, localX, localY };
+    }
+
     // Paint a chunk with selected biome
     paintChunk(worldX, worldY) {
+        if (this.paintMode === 'tile') {
+            this.paintTile(worldX, worldY);
+            return;
+        }
+
         const { chunkX, chunkY } = this.worldToChunk(worldX, worldY);
         const chunkKey = `${chunkX},${chunkY}`;
 
@@ -147,6 +188,22 @@ export class MapEditor {
         } else {
             console.warn(`Chunk ${chunkKey} not found in world (valid keys: ${Object.keys(this.world.chunks).slice(0, 5).join(', ')}...)`);
         }
+    }
+
+    paintTile(worldX, worldY) {
+        const { chunkX, chunkY, localX, localY } = this.worldToTile(worldX, worldY);
+        const chunkKey = `${chunkX},${chunkY}`;
+
+        if (!this.world || !this.world.chunks || !(chunkKey in this.world.chunks)) return;
+        if (localX < 0 || localY < 0 || localX >= CHUNK_SIZE || localY >= CHUNK_SIZE) return;
+
+        const chunk = this.world.chunks[chunkKey];
+        if (!Array.isArray(chunk.tiles) || chunk.tiles.length !== CHUNK_SIZE * CHUNK_SIZE) {
+            chunk.tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(chunk.biome || 'plains');
+        }
+
+        const idx = localY * CHUNK_SIZE + localX;
+        chunk.tiles[idx] = this.selectedBiome;
     }
 
     // Draw chunk grid overlay
@@ -228,6 +285,9 @@ export class MapEditor {
                     for (const key in chunks) {
                         if (!chunks[key].biome) {
                             chunks[key].biome = 'plains';
+                        }
+                        if (!Array.isArray(chunks[key].tiles) || chunks[key].tiles.length !== CHUNK_SIZE * CHUNK_SIZE) {
+                            chunks[key].tiles = new Array(CHUNK_SIZE * CHUNK_SIZE).fill(chunks[key].biome);
                         }
                     }
 

@@ -4,7 +4,7 @@ import {
   CHUNK_SIZE,
   TILE_SIZE,
 } from '../world/ProceduralMap.js';
-import { Wolf, Bear, EN_TYPES } from '../entities/enemy/EnemyTypes.js';
+import { Wolf, Bear, Hyena, Rabbit, EN_TYPES } from '../entities/enemy/EnemyTypes.js';
 import { ResourceFactory } from '../entities/resource/ResourceFactory.js';
 
 function loadResourcesFromChunks(world) {
@@ -47,11 +47,17 @@ function spawnEnemies(worldSize, count = 20) {
 
     let mob;
     switch (num) {
-      case 1:
+      case 0:
         mob = new Wolf(`w_${id}`, xPos, yPos);
         break;
-      default:
+      case 1:
         mob = new Bear(`b_${id}`, xPos, yPos);
+        break;
+      case 2:
+        mob = new Hyena(`h_${id}`, xPos, yPos);
+        break;
+      default:
+        mob = new Rabbit(`r_${id}`, xPos, yPos);
         break;
     }
 

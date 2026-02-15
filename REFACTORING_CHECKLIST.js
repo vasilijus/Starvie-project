@@ -185,3 +185,27 @@ Refer to:
 
 ════════════════════════════════════════════════════════════════════════════════
 `);
+
+
+console.log(`
+
+🆕 POST-REFACTOR GAMEPLAY EXTENSIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Resources
+  ├─ Added: gold, grain
+  ├─ Added: client/resource-editor.html
+  └─ Added: centralized resourceVisualDefinitions
+
+✓ Collision
+  ├─ Solid visual offsets prevented in renderer
+  ├─ Offset-aware resource collision centers
+  └─ Center-corrected collision checks for consistency
+
+✓ Enemies
+  ├─ Added: Hyena (agile predator)
+  ├─ Added: Rabbit (passive flee mob)
+  ├─ Added: FLEE enemy state
+  ├─ Wolf trait: speed boost vs <=50% HP players
+  └─ Bear trait: stronger damage + larger hunt range
+`);

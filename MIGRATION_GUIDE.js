@@ -159,3 +159,21 @@ player.addEffect(effect)                     // Add visual effect
 // - No manual healing logic needed
 // - takeDamage() automatically schedules regen
 // - Use player.heal(amount) for manual healing
+
+
+// ============================================================================
+// 2026 SYSTEM UPDATES (POST-REFACTOR)
+// ============================================================================
+// RESOURCES
+// - Added `gold` and `grain` resource types.
+// - Resource visuals now come from `client/src/rendering/definitions/resourceVisualDefinitions.js`.
+// - New tool page: `client/resource-editor.html` (dynamic type loading).
+//
+// COLLISION
+// - Solid resources are drawn at world-true positions (no visual spread offset).
+// - Server collision supports per-resource collision offsets and center-based checks.
+//
+// ENEMIES
+// - Added `Hyena` and `Rabbit` classes in `server/src/entities/enemy/EnemyTypes.js`.
+// - Enemy AI now supports `FLEE` state and per-enemy trait overrides.
+// - Wolf and bear traits were adjusted for more distinct combat behavior.

@@ -223,3 +223,25 @@ ServerPlayer                ClientPlayer
 
 BENEFIT: Clean separation, single responsibility
 ```
+
+
+---
+
+## 2026 Update: Resources, Collision Fidelity, and Expanded Enemy AI
+
+### Resource & Collision Updates
+- Added a dedicated `client/resource-editor.html` with dynamic type loading from `client/src/rendering/definitions/resourceVisualDefinitions.js`.
+- Resource visuals are now centralized in `resourceVisualDefinitions` and consumed by drawer/editor code paths.
+- Solid-resource visual offsets are blocked in rendering so client visuals align with server collision positions.
+- Server collision now supports per-resource collision offsets (`collisionOffsetX/Y`), small radius reduction, and center-based entity collision checks.
+
+### New/Updated Resources
+- Added `gold` and `grain` resource types.
+- Extended resource factory + biome rules to spawn these resources.
+- Updated resource drawing to better represent each type silhouette (tree, ore, gem, cactus, flower, grain, etc.).
+
+### Enemy AI Expansion
+- Added new enemy types: `hyena` (agile sidestep predator) and `rabbit` (passive flee mob).
+- Added enemy `FLEE` state and per-enemy AI stat overrides (hunt range, attack range, flee range, speeds, cooldown, damage).
+- Wolf trait: speeds up against players at or below 50% HP.
+- Bear trait: higher attack damage and larger detection range.

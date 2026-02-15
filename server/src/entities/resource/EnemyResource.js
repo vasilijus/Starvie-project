@@ -118,6 +118,23 @@ export const ENEMY_LOOT_TABLES = {
             { type: 'fur', min: 2, max: 3, chance: 0.8, xpReward: 15 },
             { type: 'tooth', min: 1, max: 2, chance: 0.4, xpReward: 12 }
         ]
+    },
+    hyena: {
+        guaranteed: [
+            { type: 'bone', min: 1, max: 2, xpReward: 7 }
+        ],
+        rolls: [
+            { type: 'meat', min: 2, max: 3, chance: 0.8, xpReward: 9 },
+            { type: 'tooth', min: 1, max: 2, chance: 0.55, xpReward: 10 }
+        ]
+    },
+    rabbit: {
+        guaranteed: [
+            { type: 'meat', min: 1, max: 2, xpReward: 4 }
+        ],
+        rolls: [
+            { type: 'fur', min: 1, max: 1, chance: 0.7, xpReward: 5 }
+        ]
     }
 };
 
