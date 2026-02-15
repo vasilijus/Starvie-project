@@ -49,8 +49,9 @@ export class WorldRenderer {
             if (!chunk) continue;
 
             const [chunkX, chunkY] = key.split(',').map(Number);
-            const baseX = chunkX * chunkPixelSize - px + canvasWidth / 2;
-            const baseY = chunkY * chunkPixelSize - py + canvasHeight / 2;
+            // Snap chunk origin to whole pixels to avoid anti-aliased seams between tiles.
+            const baseX = Math.floor(chunkX * chunkPixelSize - px + canvasWidth / 2);
+            const baseY = Math.floor(chunkY * chunkPixelSize - py + canvasHeight / 2);
 
             // Viewport culling: only render if chunk is visible or near-visible
             if (baseX + chunkPixelSize < minScreenX || baseX > maxScreenX ||
@@ -73,12 +74,10 @@ export class WorldRenderer {
                     const tileBiome = tiles[ty * CHUNK_SIZE + tx] || defaultBiome;
                     const color = TILE_COLORS[tileBiome] || TILE_COLORS['plains'];
                     ctx.fillStyle = color;
-                    ctx.fillRect(
-                        baseX + tx * TILE_SIZE,
-                        baseY + ty * TILE_SIZE,
-                        TILE_SIZE,
-                        TILE_SIZE
-                    );
+                    const tileX = baseX + tx * TILE_SIZE;
+                    const tileY = baseY + ty * TILE_SIZE;
+                    // Slight overlap hides 1px cracks when camera moves on fractional positions.
+                    ctx.fillRect(tileX, tileY, TILE_SIZE + 1, TILE_SIZE + 1);
                 }
             }
         }

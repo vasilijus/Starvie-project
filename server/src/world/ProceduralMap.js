@@ -33,6 +33,27 @@ function getResourceSpacing(density) {
     return 1;
 }
 
+function getClusterProfile(type, density) {
+    const clusterTypes = new Set(['tree', 'rock', 'ore', 'ice', 'crystal', 'gem', 'gold']);
+    if (!clusterTypes.has(type)) {
+        return {
+            clustered: false,
+            clusters: 0,
+            radius: 0,
+            overlapChance: 0
+        };
+    }
+
+    const baseClusters = Math.max(1, Math.round((CHUNK_SIZE * CHUNK_SIZE * density) / 4));
+    return {
+        clustered: true,
+        clusters: Math.min(baseClusters, 6),
+        radius: type === 'tree' ? 2.6 : 2.0,
+        // Allow some resources in the exact same tile cell for denser deposits/woods.
+        overlapChance: type === 'tree' ? 0.45 : 0.65
+    };
+}
+
 function getProceduralBiome(cx, cy, seed) {
     // Later we can swap this with Perlin noise
     const biomeIndex = Math.floor((cx + cy + seed) / 2) % biomes.length;
@@ -129,8 +150,8 @@ function generateChunk(cx, cy, seed) {
         }
     }
 
-    // Track occupied tile positions to prevent overlaps
-    const occupiedTiles = new Set();
+    // Track occupied tile positions to avoid extreme overstacking.
+    const occupiedTiles = new Map();
 
     // Generate resources based on biome rules
     if (biomeRule.resources) {
@@ -142,6 +163,7 @@ function generateChunk(cx, cy, seed) {
             const densityVariance = hashNoise(cx, cy, chunkSeed, type.charCodeAt(0)) * 0.4 + 0.8; // 0.8 -> 1.2
             const targetCount = Math.max(0, Math.round(expectedCount * densityVariance));
             const minSpacing = getResourceSpacing(density);
+            const clusterProfile = getClusterProfile(type, density);
 
             const candidates = [];
             for (let tileY = 0; tileY < CHUNK_SIZE; tileY++) {
@@ -160,27 +182,94 @@ function generateChunk(cx, cy, seed) {
             candidates.sort((a, b) => b.score - a.score);
 
             const selected = [];
-            for (const candidate of candidates) {
-                if (selected.length >= targetCount) break;
 
-                const key = `${candidate.tileX},${candidate.tileY}`;
-                if (occupiedTiles.has(key)) continue;
-
-                let tooClose = false;
-                for (const placed of selected) {
-                    const dx = placed.tileX - candidate.tileX;
-                    const dy = placed.tileY - candidate.tileY;
-                    if ((dx * dx + dy * dy) < (minSpacing * minSpacing)) {
-                        tooClose = true;
-                        break;
-                    }
+            if (clusterProfile.clustered) {
+                const centers = [];
+                for (let i = 0; i < clusterProfile.clusters; i++) {
+                    const seedX = Math.floor(hashNoise(cx + i, cy - i, chunkSeed, type.length + i) * CHUNK_SIZE);
+                    const seedY = Math.floor(hashNoise(cx - i, cy + i, chunkSeed, type.charCodeAt(0) + i) * CHUNK_SIZE);
+                    centers.push({ x: seedX, y: seedY });
                 }
-                if (tooClose) continue;
 
-                occupiedTiles.add(key);
-                selected.push(candidate);
+                const clustered = candidates.map((candidate) => {
+                    let minDistSq = Infinity;
+                    for (const center of centers) {
+                        const dx = candidate.tileX - center.x;
+                        const dy = candidate.tileY - center.y;
+                        const d2 = dx * dx + dy * dy;
+                        if (d2 < minDistSq) minDistSq = d2;
+                    }
 
-                const point = samplePointInTile(candidate.tileX, candidate.tileY, chunkSeed, type.charCodeAt(0));
+                    const clusterFalloff = Math.exp(-minDistSq / (clusterProfile.radius * clusterProfile.radius));
+                    const clusterScore = candidate.score * 0.45 + clusterFalloff * 0.55;
+                    return { ...candidate, clusterScore };
+                });
+
+                clustered.sort((a, b) => b.clusterScore - a.clusterScore);
+
+                const uniqueTarget = Math.max(1, Math.round(targetCount * 0.7));
+                for (const candidate of clustered) {
+                    if (selected.length >= uniqueTarget) break;
+
+                    const key = `${candidate.tileX},${candidate.tileY}`;
+                    const existingInTile = occupiedTiles.get(key) || 0;
+                    if (existingInTile >= 1) continue;
+
+                    let tooClose = false;
+                    for (const placed of selected) {
+                        const dx = placed.tileX - candidate.tileX;
+                        const dy = placed.tileY - candidate.tileY;
+                        if ((dx * dx + dy * dy) < (minSpacing * minSpacing * 0.65)) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) continue;
+
+                    occupiedTiles.set(key, existingInTile + 1);
+                    selected.push(candidate);
+                }
+
+                // Add overlapping members around cluster cores to form denser natural groups.
+                let safety = 0;
+                while (selected.length < targetCount && selected.length > 0 && safety < targetCount * 6) {
+                    safety++;
+                    const anchor = selected[safety % selected.length];
+                    const key = `${anchor.tileX},${anchor.tileY}`;
+                    const existingInTile = occupiedTiles.get(key) || 0;
+                    const allowOverlap = hashNoise(anchor.tileX, anchor.tileY, chunkSeed, type.charCodeAt(0) + safety) < clusterProfile.overlapChance;
+                    if (!allowOverlap || existingInTile >= 3) continue;
+
+                    occupiedTiles.set(key, existingInTile + 1);
+                    selected.push({ ...anchor, variantSalt: safety });
+                }
+            } else {
+                for (const candidate of candidates) {
+                    if (selected.length >= targetCount) break;
+
+                    const key = `${candidate.tileX},${candidate.tileY}`;
+                    const existingInTile = occupiedTiles.get(key) || 0;
+                    if (existingInTile > 0) continue;
+
+                    let tooClose = false;
+                    for (const placed of selected) {
+                        const dx = placed.tileX - candidate.tileX;
+                        const dy = placed.tileY - candidate.tileY;
+                        if ((dx * dx + dy * dy) < (minSpacing * minSpacing)) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) continue;
+
+                    occupiedTiles.set(key, existingInTile + 1);
+                    selected.push(candidate);
+                }
+            }
+
+            for (const candidate of selected) {
+                const variantSalt = type.charCodeAt(0) + (candidate.variantSalt || 0);
+                const point = samplePointInTile(candidate.tileX, candidate.tileY, chunkSeed, variantSalt);
                 const tileBaseX = cx * CHUNK_SIZE * TILE_SIZE + candidate.tileX * TILE_SIZE;
                 const tileBaseY = cy * CHUNK_SIZE * TILE_SIZE + candidate.tileY * TILE_SIZE;
 
