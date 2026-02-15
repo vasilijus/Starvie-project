@@ -19,10 +19,12 @@ function hashNoise(x, y, seed, salt = 0) {
     return value - Math.floor(value);
 }
 
-function jitterOffset(tileX, tileY, seed, salt = 0) {
-    const jx = (hashNoise(tileX, tileY, seed, salt) - 0.5) * TILE_SIZE * 0.55;
-    const jy = (hashNoise(tileX + 17, tileY - 23, seed, salt + 7) - 0.5) * TILE_SIZE * 0.55;
-    return { x: jx, y: jy };
+function samplePointInTile(tileX, tileY, seed, salt = 0) {
+    // Keep a small margin from tile edges to avoid clipping while avoiding dead-center placement.
+    const margin = 0.12;
+    const px = margin + hashNoise(tileX, tileY, seed, salt) * (1 - margin * 2);
+    const py = margin + hashNoise(tileX + 17, tileY - 23, seed, salt + 7) * (1 - margin * 2);
+    return { px, py };
 }
 
 function getResourceSpacing(density) {
@@ -178,14 +180,14 @@ function generateChunk(cx, cy, seed) {
                 occupiedTiles.add(key);
                 selected.push(candidate);
 
-                const jitter = jitterOffset(candidate.tileX, candidate.tileY, chunkSeed, type.charCodeAt(0));
-                const tileBaseX = cx * CHUNK_SIZE * TILE_SIZE + candidate.tileX * TILE_SIZE + TILE_SIZE / 2;
-                const tileBaseY = cy * CHUNK_SIZE * TILE_SIZE + candidate.tileY * TILE_SIZE + TILE_SIZE / 2;
+                const point = samplePointInTile(candidate.tileX, candidate.tileY, chunkSeed, type.charCodeAt(0));
+                const tileBaseX = cx * CHUNK_SIZE * TILE_SIZE + candidate.tileX * TILE_SIZE;
+                const tileBaseY = cy * CHUNK_SIZE * TILE_SIZE + candidate.tileY * TILE_SIZE;
 
                 resources.push({
                     type,
-                    x: tileBaseX + jitter.x,
-                    y: tileBaseY + jitter.y,
+                    x: tileBaseX + point.px * TILE_SIZE,
+                    y: tileBaseY + point.py * TILE_SIZE,
                     icon_color,
                     hp: 100,
                     hpMax: 100
