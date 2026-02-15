@@ -94,36 +94,66 @@ export default class Renderer {
 
             }));
 
-        // Second pass: Apply offsets to overlapping resources (iterative)
-        const MIN_DISTANCE = 35; // Minimum pixel distance between resources
-        const SEPARATION_ITERATIONS = 5; // Multiple passes for better separation
+        // Second pass: Apply offsets to overlapping resources.
+        // Keep this bounded so it cannot dominate frame time in crowded scenes.
+        const MIN_DISTANCE = 35;
+        const resourceCount = resourceScreenPositions.length;
+        const SEPARATION_ITERATIONS = resourceCount > 120 ? 1 : resourceCount > 60 ? 2 : 3;
 
-        for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
-            for (let i = 0; i < resourceScreenPositions.length; i++) {
-                for (let j = i + 1; j < resourceScreenPositions.length; j++) {
+        if (resourceCount > 1 && SEPARATION_ITERATIONS > 0) {
+            const cellSize = MIN_DISTANCE;
+
+            for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
+                const grid = new Map();
+
+                for (let i = 0; i < resourceCount; i++) {
+                    const r = resourceScreenPositions[i];
+                    if (!r.canApplyVisualOffset) continue;
+
+                    const x = r.baseX + r.offsetX;
+                    const y = r.baseY + r.offsetY;
+                    const gx = Math.floor(x / cellSize);
+                    const gy = Math.floor(y / cellSize);
+                    const key = `${gx},${gy}`;
+
+                    if (!grid.has(key)) grid.set(key, []);
+                    grid.get(key).push(i);
+                }
+
+                for (let i = 0; i < resourceCount; i++) {
                     const r1 = resourceScreenPositions[i];
-                    const r2 = resourceScreenPositions[j];
+                    if (!r1.canApplyVisualOffset) continue;
 
-                    // Keep solid resources at true world coordinates so collision and visuals match.
-                    // Visual spreading is only for non-solid resources to reduce clutter.
-                    if (!r1.canApplyVisualOffset || !r2.canApplyVisualOffset) {
-                        continue;
-                    }
+                    const x1 = r1.baseX + r1.offsetX;
+                    const y1 = r1.baseY + r1.offsetY;
+                    const gx = Math.floor(x1 / cellSize);
+                    const gy = Math.floor(y1 / cellSize);
 
-                    // Calculate distance between resources (including offsets)
-                    const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
-                    const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    for (let ny = gy - 1; ny <= gy + 1; ny++) {
+                        for (let nx = gx - 1; nx <= gx + 1; nx++) {
+                            const bucket = grid.get(`${nx},${ny}`);
+                            if (!bucket) continue;
 
-                    // If too close, push them apart more aggressively
-                    if (distance < MIN_DISTANCE && distance > 0.1) {
-                        const angle = Math.atan2(dy, dx);
-                        const pushDistance = (MIN_DISTANCE - distance) / 2 + 2; // Extra push for better separation
+                            for (const j of bucket) {
+                                if (j <= i) continue;
+                                const r2 = resourceScreenPositions[j];
+                                if (!r2.canApplyVisualOffset) continue;
 
-                        r1.offsetX -= Math.cos(angle) * pushDistance;
-                        r1.offsetY -= Math.sin(angle) * pushDistance;
-                        r2.offsetX += Math.cos(angle) * pushDistance;
-                        r2.offsetY += Math.sin(angle) * pushDistance;
+                                const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
+                                const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                                if (distance < MIN_DISTANCE && distance > 0.1) {
+                                    const angle = Math.atan2(dy, dx);
+                                    const pushDistance = (MIN_DISTANCE - distance) / 2 + 1;
+
+                                    r1.offsetX -= Math.cos(angle) * pushDistance;
+                                    r1.offsetY -= Math.sin(angle) * pushDistance;
+                                    r2.offsetX += Math.cos(angle) * pushDistance;
+                                    r2.offsetY += Math.sin(angle) * pushDistance;
+                                }
+                            }
+                        }
                     }
                 }
             }

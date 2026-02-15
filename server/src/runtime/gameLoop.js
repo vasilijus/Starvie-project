@@ -2,6 +2,15 @@ import { applyPlayerMovement } from '../systems/movement/MovementSystem.js';
 import { updateEnemiesAI } from '../systems/enemy/EnemySystem.js';
 
 const TICK_RATE = 1000 / 30;
+const VIEW_RADIUS = 700;
+const VIEW_RADIUS_SQ = VIEW_RADIUS * VIEW_RADIUS;
+
+function isWithinView(entity, player) {
+  if (!entity || !player) return false;
+  const dx = entity.x - player.x;
+  const dy = entity.y - player.y;
+  return (dx * dx + dy * dy) <= VIEW_RADIUS_SQ;
+}
 
 function processMovementQueue(state) {
   while (state.movementQueue.length > 0) {
@@ -42,27 +51,35 @@ function cleanupDrops(state) {
   }
 }
 
-function buildBasePayload(state) {
-  return {
-    players: Object.fromEntries(
-      Object.entries(state.players).map(([id, player]) => [id, player.toClient()])
-    ),
-    enemies: state.enemies,
-    world: state.world,
-    resources: state.resources.map((r) => r.toObject?.() ?? r)
-  };
+function buildPlayersPayload(state) {
+  return Object.fromEntries(
+    Object.entries(state.players).map(([id, player]) => [id, player.toClient()])
+  );
+}
+
+function buildVisibleResources(state, player) {
+  return state.resources
+    .filter((resource) => isWithinView(resource, player))
+    .map((resource) => resource.toObject?.() ?? resource);
+}
+
+function buildVisibleEnemies(state, player) {
+  return state.enemies.filter((enemy) => isWithinView(enemy, player));
 }
 
 function broadcastState(io, state) {
-  const basePayload = buildBasePayload(state);
+  const playersPayload = buildPlayersPayload(state);
 
-  for (const [socketId] of Object.entries(state.players)) {
+  for (const [socketId, player] of Object.entries(state.players)) {
     const visibleDrops = state.enemyDrops
-      .filter(drop => drop.isVisibleTo?.(socketId))
-      .map(drop => drop.toObject());
+      .filter((drop) => drop.isVisibleTo?.(socketId) && isWithinView(drop, player))
+      .map((drop) => drop.toObject());
 
     io.to(socketId).emit('state', {
-      ...basePayload,
+      players: playersPayload,
+      enemies: buildVisibleEnemies(state, player),
+      world: state.world,
+      resources: buildVisibleResources(state, player),
       enemyDrops: visibleDrops
     });
   }

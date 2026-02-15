@@ -17,6 +17,10 @@ export default class InputHandler {
         this.craftingPanel = craftingPanel;
         this.keys = {};
         this.lastState = null;
+        this.lastSentMove = null;
+        this.lastSentFacing = null;
+        this.lastFacingSentAt = 0;
+        this.facingSendIntervalMs = 50;
 
         window.addEventListener('keydown', e => this.keys[e.key] = true);
         window.addEventListener('keyup', e => this.keys[e.key] = false);
@@ -42,8 +46,28 @@ export default class InputHandler {
         if (len > 0) {
             const norm = { x: dx / len, y: dy / len };
             this.player.facingDirection = norm;
-            this.network.emit('playerFacingDirection', norm);
+            this.maybeEmitFacing(norm);
         }
+    }
+
+    maybeEmitFacing(direction) {
+        const now = Date.now();
+        if (now - this.lastFacingSentAt < this.facingSendIntervalMs) return;
+
+        const prev = this.lastSentFacing;
+        if (prev && Math.abs(prev.x - direction.x) < 0.01 && Math.abs(prev.y - direction.y) < 0.01) return;
+
+        this.network.emit('playerFacingDirection', direction);
+        this.lastSentFacing = direction;
+        this.lastFacingSentAt = now;
+    }
+
+    maybeEmitMovement(dir) {
+        const prev = this.lastSentMove;
+        if (prev && prev.x === dir.x && prev.y === dir.y) return;
+
+        this.network.emit('playerInput', dir);
+        this.lastSentMove = { ...dir };
     }
 
     startSendLoop() {
@@ -90,6 +114,7 @@ export default class InputHandler {
             }
 
             if (this.mapEditor && this.mapEditor.isActive) {
+                this.maybeEmitMovement({ x: 0, y: 0 });
                 requestAnimationFrame(send);
                 return;
             }
@@ -107,7 +132,7 @@ export default class InputHandler {
             if (this.keys['4']) this.player.selectHotbar(3);
             if (this.keys['5']) this.player.selectHotbar(4);
 
-            this.network.emit('playerInput', dir);
+            this.maybeEmitMovement(dir);
             requestAnimationFrame(send);
         };
         send();
