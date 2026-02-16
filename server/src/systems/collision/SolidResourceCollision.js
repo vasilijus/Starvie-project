@@ -11,9 +11,10 @@ function getEntityRadius(entity) {
 function getEntityCollisionCenter(entity) {
     const radius = getEntityRadius(entity);
 
+    // Entities are stored as center-point positions in world space.
     return {
-        x: (entity?.x || 0) + radius,
-        y: (entity?.y || 0) + radius,
+        x: entity?.x || 0,
+        y: entity?.y || 0,
         radius
     };
 }

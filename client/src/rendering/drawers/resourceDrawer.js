@@ -6,7 +6,7 @@ import { getResourceAtlasImage, isAtlasReady } from '../spriteAtlases.js';
 const RESOURCE_BASE_SIZE = 32;
 
 function isEmptyResource(resource) {
-    if (resource?.isEmpty || resource?.isDepleted) return true;
+    if (resource?.isEmpty || resource?.isDepleted || resource?.isDeplete) return true;
     if (typeof resource?.quantity === 'number' && resource.quantity <= 0) return true;
     if (typeof resource?.hp === 'number' && resource.hp <= 0) return true;
     return false;
@@ -27,8 +27,8 @@ export function drawResource(ctx, resource, x, y) {
     const sprite = getResourceSpriteDefinition(resource.type);
     const frame = isEmptyResource(resource) ? sprite.empty : sprite.normal;
 
-    const baseSize = Math.max(RESOURCE_BASE_SIZE, resource.renderRadius || resource.size || RESOURCE_BASE_SIZE);
-    const renderSize = baseSize * RENDER_SCALE;
+    const baseRadius = resource.renderRadius || resource.size || (RESOURCE_BASE_SIZE / 2);
+    const renderSize = Math.max(RESOURCE_BASE_SIZE, baseRadius * 2) * RENDER_SCALE;
     const half = renderSize / 2;
 
     if (isAtlasReady(atlas) && frame) {

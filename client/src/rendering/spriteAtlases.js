@@ -1,5 +1,5 @@
-import resourceSheetUrl from '../assets/resource_sprite_sheet.png';
-import enemySheetUrl from '../assets/enemies_sprite_sheet.png';
+const resourceSheetUrl = new URL('../assets/resource_sprite_sheet.png', import.meta.url).href;
+const enemySheetUrl = new URL('../assets/enemies_sprite_sheet.png', import.meta.url).href;
 
 function createAtlas(src) {
     const image = new Image();
