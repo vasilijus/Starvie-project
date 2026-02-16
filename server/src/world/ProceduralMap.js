@@ -1,7 +1,7 @@
 import { BIOME_RULES } from './BiomeRules.js';
 
 export const CHUNK_SIZE = 10;
-export const TILE_SIZE = 32;
+export const TILE_SIZE = 64;
 export const WORLD_CHUNKS = 10;
 
 const biomes = ["forest", "plains", "desert", "snow", "swamp"];

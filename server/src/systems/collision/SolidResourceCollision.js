@@ -19,7 +19,7 @@ function getEntityCollisionCenter(entity) {
     };
 }
 
-const COLLISION_RADIUS_REDUCTION = 2;
+const COLLISION_RADIUS_REDUCTION = 0;
 
 function getResourceCollisionData(resource) {
     const rawRadius = Math.max(0, resource?.collisionRadius || 0);
