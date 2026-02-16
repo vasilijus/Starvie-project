@@ -78,66 +78,25 @@ export default class Renderer {
         }
 
 
-        // First pass: Calculate screen positions for all resources
-        const resourceScreenPositions = resources
+        // Draw resources directly at world-anchored positions.
+        // NOTE: we intentionally avoid per-frame visual spreading offsets because it
+        // causes jitter/wobble while the camera moves and desynchronizes visuals
+        // from interaction/collision logic.
+        const visibleResources = resources
             .filter(r => {
                 const sx = r.x - px + this.canvas.width / 2;
                 const sy = r.y - py + this.canvas.height / 2;
-                // Check if on-screen
                 const cullPadding = scaleValue(20);
                 return !(sx < -cullPadding || sx > this.canvas.width + cullPadding || sy < -cullPadding || sy > this.canvas.height + cullPadding);
             })
             .map(r => ({
                 resource: r,
-                baseX: r.x - this.player.x + this.canvas.width / 2,
-                baseY: r.y - this.player.y + this.canvas.height / 2,
-                //  baseY: r.y - this.player.y + this.canvas.height / 2
-                offsetX: 0,
-                offsetY: 0,
-                canApplyVisualOffset: !r.isSolid
+                sx: r.x - this.player.x + this.canvas.width / 2,
+                sy: r.y - this.player.y + this.canvas.height / 2
+            }))
+            .sort((a, b) => a.sy - b.sy);
 
-            }));
-
-        // Second pass: Apply offsets to overlapping resources (iterative)
-        const MIN_DISTANCE = scaleValue(35); // Minimum pixel distance between resources
-        const SEPARATION_ITERATIONS = 5; // Multiple passes for better separation
-
-        for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
-            for (let i = 0; i < resourceScreenPositions.length; i++) {
-                for (let j = i + 1; j < resourceScreenPositions.length; j++) {
-                    const r1 = resourceScreenPositions[i];
-                    const r2 = resourceScreenPositions[j];
-
-                    // Keep solid resources at true world coordinates so collision and visuals match.
-                    // Visual spreading is only for non-solid resources to reduce clutter.
-                    if (!r1.canApplyVisualOffset || !r2.canApplyVisualOffset) {
-                        continue;
-                    }
-
-                    // Calculate distance between resources (including offsets)
-                    const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
-                    const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    // If too close, push them apart more aggressively
-                    if (distance < MIN_DISTANCE && distance > 0.1) {
-                        const angle = Math.atan2(dy, dx);
-                        const pushDistance = (MIN_DISTANCE - distance) / 2 + 2; // Extra push for better separation
-
-                        r1.offsetX -= Math.cos(angle) * pushDistance;
-                        r1.offsetY -= Math.sin(angle) * pushDistance;
-                        r2.offsetX += Math.cos(angle) * pushDistance;
-                        r2.offsetY += Math.sin(angle) * pushDistance;
-                    }
-                }
-            }
-        }
-
-        // Third pass: Draw all resources with offsets
-        for (const { resource: r, baseX, baseY, offsetX, offsetY } of resourceScreenPositions) {
-            const sx = baseX + offsetX;
-            const sy = baseY + offsetY;
-
+        for (const { resource: r, sx, sy } of visibleResources) {
             const { color, renderRadius } = drawResource(ctx, r, sx, sy);
 
             // Draw resource type label (small text above resource)
@@ -156,7 +115,6 @@ export default class Renderer {
                 ctx.strokeRect(sx - scaleValue(4), sy - scaleValue(10), scaleValue(8), scaleValue(2));
             }
         }
-
 
 
         // Draw Effects

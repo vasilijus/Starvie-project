@@ -207,7 +207,7 @@ function generateChunk(cx, cy, seed) {
 
                 clustered.sort((a, b) => b.clusterScore - a.clusterScore);
 
-                const uniqueTarget = Math.max(1, Math.round(targetCount * 0.7));
+                const uniqueTarget = Math.max(1, targetCount);
                 for (const candidate of clustered) {
                     if (selected.length >= uniqueTarget) break;
 
@@ -219,7 +219,7 @@ function generateChunk(cx, cy, seed) {
                     for (const placed of selected) {
                         const dx = placed.tileX - candidate.tileX;
                         const dy = placed.tileY - candidate.tileY;
-                        if ((dx * dx + dy * dy) < (minSpacing * minSpacing * 0.65)) {
+                        if ((dx * dx + dy * dy) < (minSpacing * minSpacing)) {
                             tooClose = true;
                             break;
                         }
@@ -230,19 +230,8 @@ function generateChunk(cx, cy, seed) {
                     selected.push(candidate);
                 }
 
-                // Add overlapping members around cluster cores to form denser natural groups.
-                let safety = 0;
-                while (selected.length < targetCount && selected.length > 0 && safety < targetCount * 6) {
-                    safety++;
-                    const anchor = selected[safety % selected.length];
-                    const key = `${anchor.tileX},${anchor.tileY}`;
-                    const existingInTile = occupiedTiles.get(key) || 0;
-                    const allowOverlap = hashNoise(anchor.tileX, anchor.tileY, chunkSeed, type.charCodeAt(0) + safety) < clusterProfile.overlapChance;
-                    if (!allowOverlap || existingInTile >= 3) continue;
-
-                    occupiedTiles.set(key, existingInTile + 1);
-                    selected.push({ ...anchor, variantSalt: safety });
-                }
+                // Intentionally avoid same-tile overlap to keep distribution even
+                // and reduce dense clumps that feel unfair for interaction/collision.
             } else {
                 for (const candidate of candidates) {
                     if (selected.length >= targetCount) break;
@@ -298,8 +287,12 @@ export function getChunk(cx, cy, seed = 1) {
             ? handmadeChunks[key].tiles
             : new Array(CHUNK_SIZE * CHUNK_SIZE).fill(biome);
 
-        // Keep authored resources from handmade maps when present.
-        const resources = handmadeChunks[key].resources || [];
+        // If handmade chunks don't define resources explicitly, fall back to
+        // procedural resource generation so edited maps don't become empty.
+        const authoredResources = handmadeChunks[key].resources;
+        const hasAuthoredResources = Array.isArray(authoredResources) && authoredResources.length > 0;
+        const procedural = generateChunk(cx, cy, seed);
+        const resources = hasAuthoredResources ? authoredResources : procedural.resources;
 
         return { biome, tiles, resources };
     }
