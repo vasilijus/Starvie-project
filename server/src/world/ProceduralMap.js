@@ -69,27 +69,14 @@ export function setHandmadeMap(jsonChunks) {
 
 
 export function generateWorld(seed = 1) {
-    // If handmade chunks were set, use them
-    if (handmadeChunks) {
-        const chunks = {};
-        for (const key in handmadeChunks) {
-            chunks[key] = handmadeChunks[key];
-        }
-        // console.log(JSON.stringify(chunks))
-        // console.log(chunks['9,9'])
-        return { chunks };
-    }
-
-    // Otherwise generate procedurally
+    // Always build full world grid via getChunk so handmade maps and
+    // procedural fallback can coexist safely.
     const chunks = {};
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
         for (let cy = 0; cy < WORLD_CHUNKS; cy++) {
             chunks[`${cx},${cy}`] = getChunk(cx, cy, seed);
-
         }
     }
-    // console.log(JSON.stringify(chunks))
-    // console.log(chunks['0,0'])
     return { chunks };
 }
 
@@ -277,6 +264,35 @@ function generateChunk(cx, cy, seed) {
     return { biome, tiles, resources };
 }
 
+function shouldUpscaleLegacyResources(resources = []) {
+    if (!Array.isArray(resources) || resources.length === 0) return false;
+
+    const LEGACY_TILE_SIZE = 32;
+    const legacyWorldSize = WORLD_CHUNKS * CHUNK_SIZE * LEGACY_TILE_SIZE;
+    let maxCoord = 0;
+
+    for (const resource of resources) {
+        maxCoord = Math.max(maxCoord, resource?.x || 0, resource?.y || 0);
+    }
+
+    // If all coordinates fit inside the old world extent while current world is bigger,
+    // treat them as legacy coordinates and upscale.
+    return TILE_SIZE > LEGACY_TILE_SIZE && maxCoord <= legacyWorldSize + LEGACY_TILE_SIZE;
+}
+
+function normalizeHandmadeResources(resources = []) {
+    if (!Array.isArray(resources)) return [];
+
+    const needsUpscale = shouldUpscaleLegacyResources(resources);
+    const scale = needsUpscale ? TILE_SIZE / 32 : 1;
+
+    return resources.map((resource) => ({
+        ...resource,
+        x: (resource?.x || 0) * scale,
+        y: (resource?.y || 0) * scale
+    }));
+}
+
 export function getChunk(cx, cy, seed = 1) {
     const key = `${cx},${cy}`;
 
@@ -292,7 +308,9 @@ export function getChunk(cx, cy, seed = 1) {
         const authoredResources = handmadeChunks[key].resources;
         const hasAuthoredResources = Array.isArray(authoredResources) && authoredResources.length > 0;
         const procedural = generateChunk(cx, cy, seed);
-        const resources = hasAuthoredResources ? authoredResources : procedural.resources;
+        const resources = hasAuthoredResources
+            ? normalizeHandmadeResources(authoredResources)
+            : procedural.resources;
 
         return { biome, tiles, resources };
     }
