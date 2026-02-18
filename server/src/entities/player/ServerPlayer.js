@@ -15,6 +15,7 @@ export class ServerPlayer {
         // Position
         this.x = x;
         this.y = y;
+        this.size = 20;
 
         // Core systems
         this.stats = new PlayerStats();
@@ -91,6 +92,7 @@ export class ServerPlayer {
             name: this.name,
             x: this.x,
             y: this.y,
+            size: this.size,
             isAlive: this.isAlive,
             hp: this.stats.hp,
             hpMax: this.stats.hpMax,

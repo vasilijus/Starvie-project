@@ -52,6 +52,7 @@ export class ClientPlayer {
     syncFromServer(serverState) {
         this.x = serverState.x;
         this.y = serverState.y;
+        this.size = serverState.size || this.size;
         this.hp = serverState.hp;
         this.hpMax = serverState.hpMax;
         this.damage = serverState.damage;

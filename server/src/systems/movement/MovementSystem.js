@@ -11,6 +11,10 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function getEntityRadius(entity) {
+    return Math.max(2, (entity?.size || 20) / 2);
+}
+
 // Normalize vector to prevent faster diagonal movement
 function normalizeDirection(dir) {
     const length = Math.hypot(dir.x, dir.y);
@@ -39,7 +43,7 @@ export function applyPlayerMovement(player, inputDir, worldSize, resources = [])
     // 4️⃣ Apply movement with axis-separate collision for simple sliding
     applyAxisSeparatedMovement(player, nextX, nextY, resources);
 
-    // 5️⃣ Keep player inside world bounds
+    // 5️⃣ Keep player inside world bounds using center + radius semantics
     clampPlayerToWorld(player, worldSize);
 }
 
@@ -56,6 +60,7 @@ function getPlayerSpeed(player) {
 }
 
 function clampPlayerToWorld(player, worldSize) {
-    player.x = clamp(player.x, WORLD_PADDING, worldSize);
-    player.y = clamp(player.y, WORLD_PADDING, worldSize);
+    const radius = getEntityRadius(player);
+    player.x = clamp(player.x, WORLD_PADDING + radius, worldSize - radius - WORLD_PADDING);
+    player.y = clamp(player.y, WORLD_PADDING + radius, worldSize - radius - WORLD_PADDING);
 }
