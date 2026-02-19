@@ -10,6 +10,13 @@ export default class Renderer {
         this.mapEditor = mapEditor;
     }
 
+    getCameraPosition() {
+        return {
+            x: this.player?.renderX ?? this.player?.x ?? 0,
+            y: this.player?.renderY ?? this.player?.y ?? 0
+        };
+    }
+
     render(state) {
         // const { players, enemies = [], resources = [] } = state;
         const { players, enemies = [], resources = [], enemyDrops = [] } = state;
@@ -18,16 +25,19 @@ export default class Renderer {
         this.worldRenderer.draw(ctx, state.world, this.player);
 
         // Use player position directly
-        const px = this.player?.x || 0;
-        const py = this.player?.y || 0;
+        const camera = this.getCameraPosition();
+        const px = camera.x;
+        const py = camera.y;
 
         // players
         for (const id in players) {
             const p = players[id];
             //   console.log(`Player: ${p.id}`)
             // console.log(`Players`, players)
-            const sx = p.x - px + this.canvas.width / 2;
-            const sy = p.y - py + this.canvas.height / 2;
+            const drawX = id === this.player.id ? (this.player.renderX ?? this.player.x) : p.x;
+            const drawY = id === this.player.id ? (this.player.renderY ?? this.player.y) : p.y;
+            const sx = drawX - px + this.canvas.width / 2;
+            const sy = drawY - py + this.canvas.height / 2;
             const playerThis = 'rgba(200,150,100,0.9)'
             const playerOther = 'rgba(139, 28, 28, 0.9)'
             ctx.fillStyle = id === state.socketId || id === this.player.id ? playerThis : playerOther;
@@ -85,8 +95,8 @@ export default class Renderer {
             })
             .map(r => ({
                 resource: r,
-                baseX: r.x - this.player.x + this.canvas.width / 2,
-                baseY: r.y - this.player.y + this.canvas.height / 2,
+                baseX: r.x - px + this.canvas.width / 2,
+                baseY: r.y - py + this.canvas.height / 2,
                 //  baseY: r.y - this.player.y + this.canvas.height / 2
                 offsetX: 0,
                 offsetY: 0,
@@ -94,36 +104,66 @@ export default class Renderer {
 
             }));
 
-        // Second pass: Apply offsets to overlapping resources (iterative)
-        const MIN_DISTANCE = 35; // Minimum pixel distance between resources
-        const SEPARATION_ITERATIONS = 5; // Multiple passes for better separation
+        // Second pass: Apply offsets to overlapping resources.
+        // Keep this bounded so it cannot dominate frame time in crowded scenes.
+        const MIN_DISTANCE = 35;
+        const resourceCount = resourceScreenPositions.length;
+        const SEPARATION_ITERATIONS = resourceCount > 120 ? 1 : resourceCount > 60 ? 2 : 3;
 
-        for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
-            for (let i = 0; i < resourceScreenPositions.length; i++) {
-                for (let j = i + 1; j < resourceScreenPositions.length; j++) {
+        if (resourceCount > 1 && SEPARATION_ITERATIONS > 0) {
+            const cellSize = MIN_DISTANCE;
+
+            for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
+                const grid = new Map();
+
+                for (let i = 0; i < resourceCount; i++) {
+                    const r = resourceScreenPositions[i];
+                    if (!r.canApplyVisualOffset) continue;
+
+                    const x = r.baseX + r.offsetX;
+                    const y = r.baseY + r.offsetY;
+                    const gx = Math.floor(x / cellSize);
+                    const gy = Math.floor(y / cellSize);
+                    const key = `${gx},${gy}`;
+
+                    if (!grid.has(key)) grid.set(key, []);
+                    grid.get(key).push(i);
+                }
+
+                for (let i = 0; i < resourceCount; i++) {
                     const r1 = resourceScreenPositions[i];
-                    const r2 = resourceScreenPositions[j];
+                    if (!r1.canApplyVisualOffset) continue;
 
-                    // Keep solid resources at true world coordinates so collision and visuals match.
-                    // Visual spreading is only for non-solid resources to reduce clutter.
-                    if (!r1.canApplyVisualOffset || !r2.canApplyVisualOffset) {
-                        continue;
-                    }
+                    const x1 = r1.baseX + r1.offsetX;
+                    const y1 = r1.baseY + r1.offsetY;
+                    const gx = Math.floor(x1 / cellSize);
+                    const gy = Math.floor(y1 / cellSize);
 
-                    // Calculate distance between resources (including offsets)
-                    const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
-                    const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    for (let ny = gy - 1; ny <= gy + 1; ny++) {
+                        for (let nx = gx - 1; nx <= gx + 1; nx++) {
+                            const bucket = grid.get(`${nx},${ny}`);
+                            if (!bucket) continue;
 
-                    // If too close, push them apart more aggressively
-                    if (distance < MIN_DISTANCE && distance > 0.1) {
-                        const angle = Math.atan2(dy, dx);
-                        const pushDistance = (MIN_DISTANCE - distance) / 2 + 2; // Extra push for better separation
+                            for (const j of bucket) {
+                                if (j <= i) continue;
+                                const r2 = resourceScreenPositions[j];
+                                if (!r2.canApplyVisualOffset) continue;
 
-                        r1.offsetX -= Math.cos(angle) * pushDistance;
-                        r1.offsetY -= Math.sin(angle) * pushDistance;
-                        r2.offsetX += Math.cos(angle) * pushDistance;
-                        r2.offsetY += Math.sin(angle) * pushDistance;
+                                const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
+                                const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                                if (distance < MIN_DISTANCE && distance > 0.1) {
+                                    const angle = Math.atan2(dy, dx);
+                                    const pushDistance = (MIN_DISTANCE - distance) / 2 + 1;
+
+                                    r1.offsetX -= Math.cos(angle) * pushDistance;
+                                    r1.offsetY -= Math.sin(angle) * pushDistance;
+                                    r2.offsetX += Math.cos(angle) * pushDistance;
+                                    r2.offsetY += Math.sin(angle) * pushDistance;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -159,8 +199,8 @@ export default class Renderer {
         this.player.activeEffects.forEach((effect, index) => {
             // 1. Calculate Screen Position
             // Subtract the world camera offset so the circle "sticks" to the ground
-            const screenX = effect.x - (this.player.x - this.canvas.width / 2);
-            const screenY = effect.y - (this.player.y - this.canvas.height / 2);
+            const screenX = effect.x - (px - this.canvas.width / 2);
+            const screenY = effect.y - (py - this.canvas.height / 2);
 
             // 2. Draw using the NEW screen coordinates
             this.ctx.beginPath();
@@ -186,7 +226,7 @@ export default class Renderer {
             this.ctx.textAlign = "left";  // Align text to the start of your coordinates
             // Use fillText(text, x, y) to place it next to the bar
             // (x + 30) moves it just past the end of a full 100% bar
-            this.ctx.fillText('combat', effect.x, effect.y);
+            this.ctx.fillText('combat', screenX, screenY);
 
             // Remove dead effects
             if (effect.life <= 0) this.player.activeEffects.splice(index, 1);
@@ -206,8 +246,8 @@ export default class Renderer {
             })
             .map(d => ({
                 drop: d,
-                baseX: d.x - this.player.x + this.canvas.width / 2,
-                baseY: d.y - this.player.y + this.canvas.height / 2
+                baseX: d.x - px + this.canvas.width / 2,
+                baseY: d.y - py + this.canvas.height / 2
             }));
 
         for (const { drop: d, baseX, baseY } of dropScreenPositions) {
