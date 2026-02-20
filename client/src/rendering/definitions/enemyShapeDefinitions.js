@@ -1,4 +1,8 @@
 export const enemyShapeDefinitions = {
+    wolf: { kind: 'wolf' },
+    bear: { kind: 'bear' },
+    hyena: { kind: 'hyena' },
+    rabbit: { kind: 'rabbit' },
     default: { kind: 'square' }
 };
 
