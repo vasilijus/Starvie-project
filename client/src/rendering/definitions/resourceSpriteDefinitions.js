@@ -1,8 +1,8 @@
 const RESOURCE_SHEET_LAYOUT = {
-    cellWidth: 256,
-    cellHeight: 154,
-    spriteOffsetX: 64,
-    spriteOffsetY: 10,
+    cellWidth: 128,
+    cellHeight: 128,
+    spriteOffsetX: 0,
+    spriteOffsetY: 0,
     spriteWidth: 128,
     spriteHeight: 128
 };
@@ -19,21 +19,14 @@ function frameAt(column, row) {
 
 export const resourceSpriteDefinitions = {
     tree: { normal: frameAt(0, 0), empty: frameAt(1, 0) },
-    berry: { normal: frameAt(2, 0), empty: frameAt(3, 0) },
     stone: { normal: frameAt(0, 1), empty: frameAt(1, 1) },
-    grass: { normal: frameAt(2, 1), empty: frameAt(3, 1) },
-    mushroom: { normal: frameAt(0, 2), empty: frameAt(1, 2) },
-    herb: { normal: frameAt(2, 2), empty: frameAt(3, 2) },
+    grass: { normal: frameAt(0, 2), empty: frameAt(0, 2) },
     flower: { normal: frameAt(0, 3), empty: frameAt(1, 3) },
-    log: { normal: frameAt(2, 3), empty: frameAt(3, 3) },
-    sand: { normal: frameAt(0, 4), empty: frameAt(1, 4) },
-    rock: { normal: frameAt(2, 4), empty: frameAt(3, 4) },
-    cactus: { normal: frameAt(2, 5), empty: frameAt(3, 5) },
-    gem: { normal: frameAt(0, 6), empty: frameAt(1, 6) },
-    ore: { normal: frameAt(2, 6), empty: frameAt(3, 6) },
-    gold: { normal: frameAt(0, 8), empty: frameAt(1, 8) },
-    crystal: { normal: frameAt(2, 8), empty: frameAt(3, 8) },
-    grain: { normal: frameAt(2, 9), empty: frameAt(3, 9) },
+    sand: { normal: frameAt(0, 4), empty: frameAt(0, 4) },
+    rock: { normal: frameAt(0, 5), empty: frameAt(0, 5) },
+    gem: { normal: frameAt(0, 6), empty: frameAt(0, 6) },
+    gold: { normal: frameAt(0, 7), empty: frameAt(0, 7) },
+    crystal: { normal: frameAt(0, 8), empty: frameAt(0, 8) },
     default: { normal: frameAt(0, 1), empty: frameAt(1, 1) }
 };
 
