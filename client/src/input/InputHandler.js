@@ -57,6 +57,21 @@ export default class InputHandler {
                 this.mPressed = false;
             }
 
+            if (this.keys['t'] || this.keys['T']) {
+                if (!this.tPressed) {
+                    if (this.mapEditor && this.mapEditor.isActive) {
+                        this.mapEditor.paintMode = this.mapEditor.paintMode === 'chunk' ? 'tile' : 'chunk';
+                        const paintModeLabel = document.getElementById('paintModeLabel');
+                        if (paintModeLabel) {
+                            paintModeLabel.textContent = this.mapEditor.paintMode === 'chunk' ? 'Chunk' : 'Tile';
+                        }
+                    }
+                    this.tPressed = true;
+                }
+            } else {
+                this.tPressed = false;
+            }
+
             // Toggle crafting panel with 'C'
             if (this.keys['c'] || this.keys['C']) {
                 if (!this.cPressed) {

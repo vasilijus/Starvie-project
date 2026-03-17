@@ -326,3 +326,15 @@ Documentation:
 Generated: February 2026
 Status: ✅ Complete
 Next: Run tests and verify all features work!
+
+
+
+[2026 UPDATE SUMMARY]
+- Added resource types: gold, grain.
+- Added dynamic resource editor page (resource-editor.html) using JS-driven type definitions.
+- Improved resource drawing fidelity for all resource classes.
+- Improved collision alignment (solid visual offset restrictions, center/offset-aware server checks).
+- Added enemy types: hyena (agile), rabbit (passive flee).
+- Added enemy FLEE state and per-enemy AI trait overrides.
+- Wolf: speed boost when player <=50% HP.
+- Bear: stronger attack and longer detection range.

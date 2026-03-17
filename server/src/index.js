@@ -24,7 +24,7 @@ app.use('/', express.static('../client'));
 
 // 2. Admin dashboard at '/admin' (loads files from '../admin-client')
 // Files in '../admin-client' will be accessible via http://localhost:3001/admin/
-app.use('/re', express.static('../resource-editor.html'));
+app.use('/re', express.static('../client/resource-editor.html'));
 
 // app.use('/test', (req, res) => {
 //   res.send('GET request to the homepage')
