@@ -1,5 +1,6 @@
 import { drawEnemy } from './drawers/enemyDrawer.js';
 import { drawResource } from './drawers/resourceDrawer.js';
+import { RENDER_SCALE, scaleValue } from './definitions/renderConstants.js';
 
 export default class Renderer {
     constructor(canvas, ctx, player, worldRenderer, mapEditor = null) {
@@ -43,11 +44,13 @@ export default class Renderer {
                 // (comment out when no longer needed)
                 // eslint-disable-next-line no-console
                 // console.log(`[Renderer] local attack: isAttacking=${cp.isAttacking} progress=${cp.attackProgress.toFixed(2)}`);
-                this.drawRotatedPlayer(ctx, sx, sy, cp.size, dir, cp);
+                const scaledSize = cp.size * RENDER_SCALE;
+                this.drawRotatedPlayer(ctx, sx - (scaledSize - cp.size) / 2, sy - (scaledSize - cp.size) / 2, scaledSize, dir, cp);
             } else {
                 // remote player: draw based on server state
                 if (p.facingDirection && (p.facingDirection.x !== 0 || p.facingDirection.y !== 0)) {
-                    this.drawRotatedPlayer(ctx, sx, sy, this.player.size, p.facingDirection, null);
+                    const scaledSize = this.player.size * RENDER_SCALE;
+                    this.drawRotatedPlayer(ctx, sx - (scaledSize - this.player.size) / 2, sy - (scaledSize - this.player.size) / 2, scaledSize, p.facingDirection, null);
                 } else {
                     // ctx.fillRect(sx, sy, this.player.size, this.player.size);
                     ctx.roundRect(10, 150, 150, 100, [10, 10]);
@@ -63,7 +66,7 @@ export default class Renderer {
         const playerScreenY = this.canvas.height / 2;
         // console.log(`[Renderer] Arrow direction: (${this.player.facingDirection.x.toFixed(2)}, ${this.player.facingDirection.y.toFixed(2)})`);
         // Testing debug
-        this.drawDirectionLine(ctx, playerScreenX + this.player.size/2, playerScreenY +this.player.size/2, this.player.facingDirection);
+        this.drawDirectionLine(ctx, playerScreenX + this.player.size / 2, playerScreenY + this.player.size / 2, this.player.facingDirection);
 
         // enemies
         for (const enemy of enemies) {
@@ -75,84 +78,43 @@ export default class Renderer {
         }
 
 
-        // First pass: Calculate screen positions for all resources
-        const resourceScreenPositions = resources
+        // Draw resources directly at world-anchored positions.
+        // NOTE: we intentionally avoid per-frame visual spreading offsets because it
+        // causes jitter/wobble while the camera moves and desynchronizes visuals
+        // from interaction/collision logic.
+        const visibleResources = resources
             .filter(r => {
                 const sx = r.x - px + this.canvas.width / 2;
                 const sy = r.y - py + this.canvas.height / 2;
-                // Check if on-screen
-                return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
+                const cullPadding = scaleValue(20);
+                return !(sx < -cullPadding || sx > this.canvas.width + cullPadding || sy < -cullPadding || sy > this.canvas.height + cullPadding);
             })
             .map(r => ({
                 resource: r,
-                baseX: r.x - this.player.x + this.canvas.width / 2,
-                baseY: r.y - this.player.y + this.canvas.height / 2,
-                //  baseY: r.y - this.player.y + this.canvas.height / 2
-                offsetX: 0,
-                offsetY: 0,
-                canApplyVisualOffset: !r.isSolid
+                sx: r.x - this.player.x + this.canvas.width / 2,
+                sy: r.y - this.player.y + this.canvas.height / 2
+            }))
+            .sort((a, b) => a.sy - b.sy);
 
-            }));
-
-        // Second pass: Apply offsets to overlapping resources (iterative)
-        const MIN_DISTANCE = 35; // Minimum pixel distance between resources
-        const SEPARATION_ITERATIONS = 5; // Multiple passes for better separation
-
-        for (let iteration = 0; iteration < SEPARATION_ITERATIONS; iteration++) {
-            for (let i = 0; i < resourceScreenPositions.length; i++) {
-                for (let j = i + 1; j < resourceScreenPositions.length; j++) {
-                    const r1 = resourceScreenPositions[i];
-                    const r2 = resourceScreenPositions[j];
-
-                    // Keep solid resources at true world coordinates so collision and visuals match.
-                    // Visual spreading is only for non-solid resources to reduce clutter.
-                    if (!r1.canApplyVisualOffset || !r2.canApplyVisualOffset) {
-                        continue;
-                    }
-
-                    // Calculate distance between resources (including offsets)
-                    const dx = (r2.baseX + r2.offsetX) - (r1.baseX + r1.offsetX);
-                    const dy = (r2.baseY + r2.offsetY) - (r1.baseY + r1.offsetY);
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    // If too close, push them apart more aggressively
-                    if (distance < MIN_DISTANCE && distance > 0.1) {
-                        const angle = Math.atan2(dy, dx);
-                        const pushDistance = (MIN_DISTANCE - distance) / 2 + 2; // Extra push for better separation
-
-                        r1.offsetX -= Math.cos(angle) * pushDistance;
-                        r1.offsetY -= Math.sin(angle) * pushDistance;
-                        r2.offsetX += Math.cos(angle) * pushDistance;
-                        r2.offsetY += Math.sin(angle) * pushDistance;
-                    }
-                }
-            }
-        }
-
-        // Third pass: Draw all resources with offsets
-        for (const { resource: r, baseX, baseY, offsetX, offsetY } of resourceScreenPositions) {
-            const sx = baseX + offsetX;
-            const sy = baseY + offsetY;
-
+        for (const { resource: r, sx, sy } of visibleResources) {
             const { color, renderRadius } = drawResource(ctx, r, sx, sy);
 
             // Draw resource type label (small text above resource)
             ctx.fillStyle = color;
-            ctx.font = '10px Arial';
+            ctx.font = `${scaleValue(10)}px Arial`;
             ctx.textAlign = 'center';
-            ctx.fillText(r.type || 'resource', sx, sy - (renderRadius + 6));
+            ctx.fillText(r.type || 'resource', sx, sy - (renderRadius + scaleValue(6)));
 
             // Draw HP indicator if damaged
             if (r.hp !== undefined && r.hpMax !== undefined && r.hp < r.hpMax) {
                 const hpPercent = r.hp / r.hpMax;
                 ctx.fillStyle = hpPercent > 0.5 ? '#00AA00' : hpPercent > 0.25 ? '#FFAA00' : '#AA0000';
-                ctx.fillRect(sx - 4, sy - 10, 8 * hpPercent, 2);
+                ctx.fillRect(sx - scaleValue(4), sy - scaleValue(10), scaleValue(8) * hpPercent, scaleValue(2));
                 ctx.strokeStyle = '#333333';
-                ctx.lineWidth = 0.5;
-                ctx.strokeRect(sx - 4, sy - 10, 8, 2);
+                ctx.lineWidth = Math.max(0.5, scaleValue(0.5));
+                ctx.strokeRect(sx - scaleValue(4), sy - scaleValue(10), scaleValue(8), scaleValue(2));
             }
         }
-
 
 
         // Draw Effects
@@ -202,7 +164,8 @@ export default class Renderer {
             .filter(d => {
                 const sx = d.x - px + this.canvas.width / 2;
                 const sy = d.y - py + this.canvas.height / 2;
-                return !(sx < -20 || sx > this.canvas.width + 20 || sy < -20 || sy > this.canvas.height + 20);
+                const cullPadding = scaleValue(20);
+                return !(sx < -cullPadding || sx > this.canvas.width + cullPadding || sy < -cullPadding || sy > this.canvas.height + cullPadding);
             })
             .map(d => ({
                 drop: d,
@@ -218,20 +181,20 @@ export default class Renderer {
             const color = d.icon_color || '#FFD700';
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            ctx.arc(sx, sy, scaleValue(6), 0, Math.PI * 2);
             ctx.fill();
 
             // Draw drop type label
             ctx.fillStyle = color;
-            ctx.font = '10px Arial';
+            ctx.font = `${scaleValue(10)}px Arial`;
             ctx.textAlign = 'center';
-            ctx.fillText(d.type, sx, sy - 10);
+            ctx.fillText(d.type, sx, sy - scaleValue(10));
 
             // Show quantity if > 1
             if (d.quantity > 1) {
                 ctx.fillStyle = '#fff';
-                ctx.font = 'bold 9px Arial';
-                ctx.fillText(`x${d.quantity}`, sx + 8, sy + 8);
+                ctx.font = `bold ${scaleValue(9)}px Arial`;
+                ctx.fillText(`x${d.quantity}`, sx + scaleValue(8), sy + scaleValue(8));
             }
         }
     }
@@ -246,30 +209,30 @@ export default class Renderer {
         else if (hp < 80) barColor = "#d1bf00";
         // 2. Draw the Health Bar
         ctx.fillStyle = barColor;
-        ctx.fillRect(x - 5, y - 20, (hp / 100) * 30, 5);
+        ctx.fillRect(x - scaleValue(5), y - scaleValue(20), (hp / 100) * scaleValue(30), scaleValue(5));
         // 3. Draw the HP Number
         ctx.fillStyle = "black"; // Choose a color that stands out
-        ctx.font = "9px Arial"; // Set size and font
+        ctx.font = `${scaleValue(9)}px Arial`; // Set size and font
         ctx.textAlign = "left";  // Align text to the start of your coordinates
         // Use fillText(text, x, y) to place it next to the bar
         // (x + 30) moves it just past the end of a full 100% bar
-        ctx.fillText(Math.floor(hp), x + 2, y - 25);
+        ctx.fillText(Math.floor(hp), x + scaleValue(2), y - scaleValue(25));
     }
     drawDirectionLine(ctx, centerX, centerY, direction) {
         if (!direction) return;
-        const length = 30; // Length of the direction line
+        const length = scaleValue(30); // Length of the direction line
         const endX = centerX + direction.x * length;
         const endY = centerY + direction.y * length;
 
         ctx.strokeStyle = 'yellow';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = scaleValue(2);
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
         // Draw arrowhead
-        const arrowSize = 8;
+        const arrowSize = scaleValue(8);
         const angle = Math.atan2(direction.y, direction.x);
         ctx.fillStyle = 'yellow';
         ctx.beginPath();
@@ -335,7 +298,7 @@ export default class Renderer {
      * Handles the logic for positioning and drawing hands.
      */
     _drawHands(ctx, size, clientState) {
-        const handRadius = Math.max(3, Math.floor(size * 0.2));
+        const handRadius = Math.max(scaleValue(3), Math.floor(size * 0.2));
         const armDistance = size * 1.2;
         const halfArm = armDistance / 2;
 

@@ -8,6 +8,10 @@ const getDistSq = (x1, y1, x2, y2) => {
     return dx * dx + dy * dy;
 };
 
+function getEntityRadius(entity) {
+    return Math.max(2, (entity?.size || 20) / 2);
+}
+
 function findClosestPlayer(enemy, players) {
     let closest = null;
     let best = Infinity;
@@ -49,7 +53,8 @@ export function updateEnemiesAI(enemies, alivePlayers, worldSize, resources = []
                 break;
         }
 
-        enemy.x = Math.max(0, Math.min(worldSize, enemy.x));
-        enemy.y = Math.max(0, Math.min(worldSize, enemy.y));
+        const radius = getEntityRadius(enemy);
+        enemy.x = Math.max(radius, Math.min(worldSize - radius, enemy.x));
+        enemy.y = Math.max(radius, Math.min(worldSize - radius, enemy.y));
     }
 }
