@@ -11,6 +11,10 @@ export class ClientPlayer {
         this.x = 0;
         this.y = 0;
 
+        // Smoothed render/camera position (client-side interpolation)
+        this.renderX = 0;
+        this.renderY = 0;
+
         // Display stats (synced from server)
         this.hp = 100;
         this.hpMax = 100;
@@ -52,7 +56,11 @@ export class ClientPlayer {
     syncFromServer(serverState) {
         this.x = serverState.x;
         this.y = serverState.y;
-        this.size = serverState.size || this.size;
+
+        if (this.renderX === 0 && this.renderY === 0) {
+            this.renderX = this.x;
+            this.renderY = this.y;
+        }
         this.hp = serverState.hp;
         this.hpMax = serverState.hpMax;
         this.damage = serverState.damage;
@@ -67,9 +75,13 @@ export class ClientPlayer {
     }
 
     /**
-     * Update (no-op now that we use direct x/y)
+     * Update local visual smoothing and short-lived animations.
      */
     update() {
+        const smoothing = 0.25;
+        this.renderX += (this.x - this.renderX) * smoothing;
+        this.renderY += (this.y - this.renderY) * smoothing;
+
         // Update attack animation progress
         if (this.isAttacking) {
             const now = Date.now();
