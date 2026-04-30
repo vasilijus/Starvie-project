@@ -6,6 +6,8 @@ const getDistSq = (x1, y1, x2, y2) => {
     return dx * dx + dy * dy;
 };
 
+const getEntityRadius = (entity) => Math.max(2, (entity?.size || 20) / 2);
+
 function getWanderSpeed(enemy) {
     return enemy?.wanderSpeed ?? AI.WANDER_SPEED;
 }
@@ -35,14 +37,24 @@ export function wander(enemy, alivePlayers, resources = []) {
     const newX = enemy.x + enemy.moveDirection.x * speed;
     const newY = enemy.y + enemy.moveDirection.y * speed;
 
+    const enemyRadius = getEntityRadius(enemy);
     for (const p of alivePlayers) {
-        if (getDistSq(newX, newY, p.x, p.y) <= AI.COLLISION_SQ) return;
+        const playerRadius = getEntityRadius(p);
+        const minDistance = enemyRadius + playerRadius;
+        if (getDistSq(newX, newY, p.x, p.y) <= (minDistance * minDistance)) return;
     }
 
     applyAxisSeparatedMovement(enemy, newX, newY, resources);
 }
 
 export function chase(enemy, player, resources = []) {
+    const enemyRadius = getEntityRadius(enemy);
+    const playerRadius = getEntityRadius(player);
+    const stopDistance = enemyRadius + playerRadius + 2;
+    if (getDistSq(enemy.x, enemy.y, player.x, player.y) <= (stopDistance * stopDistance)) {
+        return;
+    }
+
     const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
     const speed = getChaseSpeed(enemy, player);
 
